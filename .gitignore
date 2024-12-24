@@ -82,14 +82,16 @@ ui_*.h
 # 6. 3rdparty / model ディレクトリのビルド成果物
 # ==================================================================
 # whisper.cpp のビルドディレクトリ（例）
-whisper.cpp/build/
-whisper.cpp/bin/
-whisper.cpp/.cmake/
-
-# llama.cpp のビルドディレクトリ（例）
-llama.cpp/build/
-llama.cpp/bin/
-llama.cpp/.cmake/
+3rdparty/whisper.cpp/build/
+3rdparty/whisper.cpp/bin/
+3rdparty/llama.cpp/build/
+3rdparty/llama.cpp/bin/
+# モデルファイルを入れる場合も除外
+3rdparty/whisper.cpp/models/
+3rdparty/llama.cpp/models/
+*.bin
+*.ggml
+*.gguf
 
 # ==================================================================
 # 7. 大きなモデルやキャッシュファイル（例）
