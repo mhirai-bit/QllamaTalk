@@ -62,6 +62,7 @@ cmake-build-*/
 # ==================================================================
 CMakeFiles/
 CMakeCache.txt
+CMakeLists.txt.user
 cmake_install.cmake
 Makefile
 Makefile.in
