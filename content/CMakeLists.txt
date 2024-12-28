@@ -3,6 +3,7 @@
 
 qt_add_library(content STATIC)
 find_package(llama REQUIRED PATHS "/usr/local/lib")
+
 qt6_add_qml_module(content
     URI "content"
     VERSION 1.0
@@ -24,4 +25,11 @@ qt6_add_qml_module(content
 )
 target_link_libraries(content PRIVATE
     llama
+)
+add_custom_command(
+    TARGET content POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_LIST_DIR}/llama_models/Llama-3.1-8B-Open-SFT.Q4_K_M.gguf"
+        "$<TARGET_FILE_DIR:QllamaTalkApp>"
+    COMMENT "Copying Llama-3.1-8B-Open-SFT.Q4_K_M.gguf next to the QllamaTalkApp binary"
 )

@@ -3,7 +3,6 @@
 
 // The path to the LLaMA model we load by default.
 const std::string LlamaChatEngine::m_model_path {
-    "/Users/mainuser/Documents/Projects/QllamaTalk/3rdparty/llama.cpp/models/"
     "Llama-3.1-8B-Open-SFT.Q4_K_M.gguf"
 };
 
