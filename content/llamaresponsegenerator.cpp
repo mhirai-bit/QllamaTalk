@@ -31,7 +31,7 @@ void LlamaResponseGenerator::generate(const QString &prompt)
 
     const int n_prompt_tokens = -llama_tokenize(m_model, promptStd.c_str(), prompt.size(), NULL, 0, true, true);
     std::vector<llama_token> prompt_tokens(n_prompt_tokens);
-    if (llama_tokenize(m_model, promptStd.c_str(), prompt.size(), prompt_tokens.data(), prompt_tokens.size(), llama_get_kv_cache_used_cells(m_ctx) == 0, true) < 0) {
+    if (llama_tokenize(m_model, promptStd.c_str(), promptStd.size(), prompt_tokens.data(), prompt_tokens.size(), llama_get_kv_cache_used_cells(m_ctx) == 0, true) < 0) {
         emit generationError("failed to tokenize the prompt");
         GGML_ABORT("failed to tokenize the prompt\n");
     }
@@ -53,7 +53,7 @@ void LlamaResponseGenerator::generate(const QString &prompt)
             break;
         }
 
-        char buf[256];
+        char buf[256] = {};
         int n = llama_token_to_piece(m_model, new_token_id, buf, sizeof(buf), 0, true);
         if (n < 0) {
             emit generationError("failed to convert token to piece");
