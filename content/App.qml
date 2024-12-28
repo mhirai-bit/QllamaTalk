@@ -5,8 +5,8 @@ import QtQuick 6.2
 import QllamaTalk
 
 Window {
-    width: mainScreen.width
-    height: mainScreen.height
+    width: 800
+    height: 480
 
     visible: true
     title: "QllamaTalk"
