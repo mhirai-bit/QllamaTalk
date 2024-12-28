@@ -3,37 +3,47 @@
 
 #include <QObject>
 #include <QString>
-
 #include "llama.h"
 
-class LlamaResponseGenerator : public QObject
-{
+// This class handles text generation for LLaMA-based models.
+// It is typically used in a worker thread to generate responses asynchronously.
+class LlamaResponseGenerator : public QObject {
     Q_OBJECT
+
 public:
+    // Disallow default construction to ensure model/context are always provided.
     LlamaResponseGenerator() = delete;
-    LlamaResponseGenerator(QObject *parent = nullptr, llama_model* model = nullptr, llama_context* ctx = nullptr);
+
+    // Constructor expects a LLaMA model, a context, and an optional parent.
+    // 'parent' may be nullptr when the object is moved to another thread.
+    LlamaResponseGenerator(QObject *parent = nullptr,
+                           llama_model* model = nullptr,
+                           llama_context* ctx = nullptr);
+
+    // Cleans up any allocated resources (e.g. the sampler) on destruction.
     ~LlamaResponseGenerator() override;
 
 public slots:
-    // "generate" スロット: QMLやメインスレッド側から呼び出してもらう想定
-    // スレッド内で動作し、文字列を段階的に通知していく
+    // Generates text from the provided prompt, emitting partial and final results.
     void generate(const QString &prompt);
+
 signals:
-    // 部分的に生成された文字列を通知するシグナル
-    // たとえばトークンごと、または一定文字数ごと、行ごとなど
+    // Emitted periodically with incremental output during generation.
     void partialResponseReady(const QString &textSoFar);
 
-    // 生成処理が完了したら通知するシグナル
+    // Emitted once the entire generation process is complete.
     void generationFinished(const QString &finalResponse);
 
-    // もしエラー等を通知したい場合はこういうシグナルを用意
+    // Emitted in case of an error (e.g., tokenization failure).
     void generationError(const QString &errorMessage);
 
 private:
+    // References to the LLaMA model and context used for generation.
     llama_model* m_model {nullptr};
     llama_context* m_ctx {nullptr};
     llama_sampler* m_sampler {nullptr};
 
+    // Initializes the sampler (temperature, min_p, etc.) before text generation.
     void initializeSampler();
 };
 

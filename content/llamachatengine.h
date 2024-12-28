@@ -7,53 +7,71 @@
 #include "chatmessagemodel.h"
 #include "llamaresponsegenerator.h"
 
-class LlamaChatEngine: public QObject {
+// This class serves as the main controller for the chat logic.
+// It interacts with a ChatMessageModel to store messages
+// and uses LlamaResponseGenerator to generate AI responses.
+class LlamaChatEngine : public QObject {
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON
-    Q_PROPERTY(ChatMessageModel *messages READ messages CONSTANT)
+
+    // Q_PROPERTY: Exposes a chat message model and a user_input string to QML.
+    Q_PROPERTY(ChatMessageModel* messages READ messages CONSTANT)
     Q_PROPERTY(QString user_input READ user_input WRITE setUser_input RESET resetUser_input NOTIFY user_inputChanged FINAL)
+
 public:
     explicit LlamaChatEngine(QObject *parent = nullptr);
     ~LlamaChatEngine() override;
 
-    ChatMessageModel *messages();
+    // Returns the chat message model used by QML for display.
+    ChatMessageModel* messages();
 
+    // Getter/setter for the user's input text.
     QString user_input() const;
     Q_INVOKABLE void setUser_input(const QString &newUser_input);
     void resetUser_input();
 
 public slots:
+    // Triggered when user_input changes. Prepares the prompt and requests generation.
     void handle_new_user_input();
 
 signals:
+    // Notifies QML that user_input has changed.
     void user_inputChanged();
+    // Request generation of a response from the LlamaResponseGenerator.
     void requestGeneration(const QString &prompt);
 
 private slots:
-    // 生成スレッドからの通知を受け取るスロット
+    // Updates the UI when partial responses arrive from the generator.
     void onPartialResponse(const QString &textSoFar);
+    // Finalizes the UI update when the generation finishes.
     void onGenerationFinished(const QString &finalResponse);
 
 private:
+    // Configuration for LLaMA model usage.
     static constexpr int m_ngl {99};
-    static constexpr int m_n_ctx = {2048};
+    static constexpr int m_n_ctx {2048};
     static const std::string m_model_path;
     llama_model_params m_model_params;
     llama_model* m_model;
     llama_context_params m_ctx_params;
     llama_context* m_ctx;
 
+    // Worker object for text generation in another thread.
     LlamaResponseGenerator* m_response_generator;
 
+    // Tracks whether a response is currently being generated.
     bool m_inProgress {false};
+    // Index of the last AI message in the ChatMessageModel.
     int m_currentAssistantIndex {-1};
 
-    // Exposed to QML
+    // The user's current input text (exposed to QML).
     QString m_user_input;
+    // The model holding all chat messages (system, user, assistant).
     ChatMessageModel m_messages;
 
-    void generate(const std::string &prompt, std::string& response);
+    // Optional helper for synchronous generation (if needed).
+    void generate(const std::string &prompt, std::string &response);
 };
 
 #endif // LLAMACHATENGINE_H
