@@ -17,12 +17,6 @@ Rectangle {
         }
     }
 
-    // QML property to help with dynamic height debugging (if needed)
-    property int test
-    onTestChanged: {
-        console.log("test = ", test)
-    }
-
     ListView {
         id: messageListView
         anchors.top: parent.top
@@ -43,9 +37,6 @@ Rectangle {
 
                 // The Column below will determine total height
                 height: _messageColumn.height + 20
-                onHeightChanged: {
-                    console.log("ImageWrapper (outerWrapper).height = ", height)
-                }
 
                 // Decide if it's a user message or assistant
                 property bool ownMessage: (model.sender === "user")
@@ -80,10 +71,6 @@ Rectangle {
                     // Dynamically compute total height from children
                     height: _userName.implicitHeight + textBody.implicitHeight
 
-                    onHeightChanged: {
-                        console.log("_messageColumn.height =", height)
-                    }
-
                     // Sender label (You / AI)
                     Text {
                         id: _userName
@@ -105,13 +92,6 @@ Rectangle {
                         color: "#f3f3f4"
                         wrapMode: Text.Wrap
                         text: model.messageContent
-
-                        onHeightChanged: {
-                            console.log("textBody.height =", height)
-                            console.log("textBody.implicitHeight =", implicitHeight)
-                            // Optional: store in `root.test` if you want to debug
-                            // root.test = textBody.height
-                        }
                     }
                 }
             }
@@ -138,21 +118,6 @@ Rectangle {
         onAccepted: {
             LlamaChatEngine.setUser_input(_inputField.text)
             _inputField.text = ""
-        }
-
-        Keys.onPressed: (event) =>  {
-            if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)) {
-                console.log("Ctrl + V")
-                switch (LlamaChatEngine.clipBoardContentType) {
-                case LlamaChatEngine.Text:
-                    _inputField.paste()
-                    break
-                case LlamaChatEngine.Image:
-                    LlamaChatEngine.sendImageFromClipboard()
-                    break
-                }
-                event.accepted = true
-            }
         }
     }
 }

@@ -14,6 +14,5 @@ Window {
     ChatView {
         id: mainScreen
     }
-
 }
 
