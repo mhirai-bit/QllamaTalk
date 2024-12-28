@@ -29,6 +29,10 @@ Rectangle {
             Item {
                 id: _imageWrapper
                 height: _messageColumn.height + 20
+                onHeightChanged: {
+                    console.log("ImageWrapper.height = ", height)
+                }
+
                 width: parent.width/2 - 20
                 property bool ownMessage: model.sender === "user"
                 anchors{
@@ -49,6 +53,11 @@ Rectangle {
 
                 Column {
                     id: _messageColumn
+                    height: _userName.implicitHeight + delegateLoader.height
+                    onHeightChanged: {
+                        console.log("Column.height = ", height)
+                    }
+
                     anchors {
                         left: parent.left
                         right: parent.right
@@ -56,6 +65,7 @@ Rectangle {
                         rightMargin: 10
                         verticalCenter: parent.verticalCenter
                     }
+
                     Text {
                         id: _userName
                         property string from: _imageWrapper.ownMessage ? qsTr("You") : qsTr("AI")
@@ -71,12 +81,29 @@ Rectangle {
                         id: delegateLoader
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        height: item ? item.height : 0
+                        // height: item ? item.height : 0
+                        height: item ? root.test: 0
+                        // Connections {
+                        //     target: item
+                        //     onHeightChanged: {
+                        //         console.log("assigning innerText.height to delegateLoader.height")
+                        //         delegateLoader.height = item.height
+                        //     }
+                        // }
+
                         sourceComponent: textDelegate
                         onItemChanged:  {
                             if (item) {
                                 item.content = model.messageContent
+                                console.log("---------")
+                                console.log(model.sender)
+                                console.log("item.impliciHeight = ", item.implicitHeight)
+                                console.log("item.height = ", item.height)
+                                console.log("delegateLoader.height = ", delegateLoader.height)
                             }
+                        }
+                        onHeightChanged: {
+                            console.log("delegateLoader.height = ", height)
                         }
                     }
                 }
@@ -85,6 +112,11 @@ Rectangle {
         onCountChanged: {
             Qt.callLater( messageListView.positionViewAtEnd )
         }
+    }
+
+    property int test
+    onTestChanged: {
+        console.log("test = ", test)
     }
 
     Component {
@@ -100,6 +132,11 @@ Rectangle {
                 font.pointSize: 12
                 color: "#f3f3f4"
                 wrapMode: Text.Wrap
+                onHeightChanged: {
+                    console.log("textDelegate.height = ", height)
+                    console.log("textDelegate.implicitHeight = ", implicitHeight)
+                    root.test = innerText.height
+                }
             }
         }
     }
