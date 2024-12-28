@@ -56,16 +56,16 @@ Rectangle {
                         rightMargin: 10
                         verticalCenter: parent.verticalCenter
                     }
-                    Text {
-                        id: _userName
-                        property string from: _imageWrapper.ownMessage ? qsTr("You") : model.from
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        font.pointSize: 12
-                        font.weight: Font.Bold
-                        color: "#f3f3f4"
-                        text: _userName.from + ": "
-                    }
+                    // Text {
+                    //     id: _userName
+                    //     property string from: _imageWrapper.ownMessage ? qsTr("You") : model.from
+                    //     anchors.left: parent.left
+                    //     anchors.right: parent.right
+                    //     font.pointSize: 12
+                    //     font.weight: Font.Bold
+                    //     color: "#f3f3f4"
+                    //     text: _userName.from + ": "
+                    // }
 
                     Loader {
                         id: delegateLoader
@@ -116,7 +116,7 @@ Rectangle {
 
         placeholderText: qsTr("Start typing here or paste an image")
         onAccepted: {
-            LlamaChatEngine.sendMessage(_inputField.text)
+            LlamaChatEngine.setUser_input(_inputField.text)
             _inputField.text = ""
         }
 

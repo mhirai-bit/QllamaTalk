@@ -23,9 +23,9 @@ QVariant ChatMessageModel::data(const QModelIndex &index, int role) const {
     const auto &data = m_messages.at(row);
     switch (role) {
     case Sender:
-        return QVariant::fromValue(data.role);
+        return QVariant::fromValue(QString(data.role));
     case MessageContent:
-        return QVariant::fromValue(data.content);
+        return QVariant::fromValue(QString(data.content));
     }
 
     return QVariant();

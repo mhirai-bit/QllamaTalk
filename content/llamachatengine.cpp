@@ -45,16 +45,17 @@ auto LlamaChatEngine::generate(const std::string& prompt) {
 
 void LlamaChatEngine::handle_new_user_input() {
 
-    std::vector<llama_chat_message> messages;
+    static std::vector<llama_chat_message> messages;
+    static std::vector<char> formatted(llama_n_ctx(m_ctx));
+    static int prev_len {0};
 
-    if (m_user_input.empty()) {
+    std::string user_input = m_user_input.toStdString();
+
+    if (user_input.empty()) {
         return;
     }
 
-    std::vector<char> formatted(llama_n_ctx(m_ctx));
-    static int prev_len {0};
-
-    messages.push_back({"user", strdup(m_user_input.c_str())});
+    messages.push_back({"user", strdup(user_input.c_str())});
     int new_len = llama_chat_apply_template(m_model, nullptr, messages.data(), messages.size(), true, formatted.data(), formatted.size());
     if (new_len > (int)formatted.size()) {
         formatted.resize(new_len);
@@ -118,12 +119,12 @@ LlamaChatEngine::~LlamaChatEngine() {
     llama_free_model(m_model);
 }
 
-std::string LlamaChatEngine::user_input() const
+QString LlamaChatEngine::user_input() const
 {
     return m_user_input;
 }
 
-void LlamaChatEngine::setUser_input(const std::string &newUser_input)
+void LlamaChatEngine::setUser_input(const QString &newUser_input)
 {
     if (m_user_input == newUser_input)
         return;

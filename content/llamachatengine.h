@@ -11,15 +11,15 @@ class LlamaChatEngine: public QObject {
     QML_ELEMENT
     QML_SINGLETON
     Q_PROPERTY(ChatMessageModel *messages READ messages CONSTANT)
-    Q_PROPERTY(std::string user_input READ user_input WRITE setUser_input RESET resetUser_input NOTIFY user_inputChanged FINAL)
+    Q_PROPERTY(QString user_input READ user_input WRITE setUser_input RESET resetUser_input NOTIFY user_inputChanged FINAL)
 public:
     explicit LlamaChatEngine(QObject *parent = nullptr);
     ~LlamaChatEngine() override;
 
     ChatMessageModel *messages();
 
-    std::string user_input() const;
-    void setUser_input(const std::string &newUser_input);
+    QString user_input() const;
+    Q_INVOKABLE void setUser_input(const QString &newUser_input);
     void resetUser_input();
 
 public slots:
@@ -39,7 +39,7 @@ private:
     llama_sampler* m_sampler;
 
     // Exposed to QML
-    std::string m_user_input;
+    QString m_user_input;
     ChatMessageModel m_messages;
 
     auto generate(const std::string &prompt);
