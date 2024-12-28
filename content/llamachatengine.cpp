@@ -91,7 +91,7 @@ LlamaChatEngine::LlamaChatEngine(QObject *parent)
     }
 
     QThread* workerThread = new QThread(this);
-    m_response_generator = new LlamaResponseGenerator(this, m_model, m_ctx);
+    m_response_generator = new LlamaResponseGenerator(nullptr, m_model, m_ctx);
     m_response_generator->moveToThread(workerThread);
 
     workerThread->start();
@@ -100,6 +100,7 @@ LlamaChatEngine::LlamaChatEngine(QObject *parent)
     connect(this, &LlamaChatEngine::requestGeneration, m_response_generator, &LlamaResponseGenerator::generate);
     connect(m_response_generator, &LlamaResponseGenerator::partialResponseReady, this, &LlamaChatEngine::onPartialResponse);
     connect(m_response_generator, &LlamaResponseGenerator::generationFinished, this, &LlamaChatEngine::onGenerationFinished);
+    connect(workerThread, &QThread::finished, m_response_generator, &QObject::deleteLater);
 }
 
 LlamaChatEngine::~LlamaChatEngine() {
