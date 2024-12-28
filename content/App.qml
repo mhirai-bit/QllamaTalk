@@ -11,7 +11,7 @@ Window {
     visible: true
     title: "QllamaTalk"
 
-    Screen01 {
+    ChatView {
         id: mainScreen
     }
 
