@@ -2,7 +2,7 @@
 ### Do not change
 
 qt_add_library(content STATIC)
-find_package(llama REQUIRED PATHS "/usr/local/lib")
+find_package(llama REQUIRED PATHS ${LLAMA_LIB_DIR})
 
 qt6_add_qml_module(content
     URI "content"

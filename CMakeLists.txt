@@ -5,6 +5,10 @@ option(BUILD_QDS_COMPONENTS "Build design studio components" ON)
 
 project(QllamaTalkApp LANGUAGES CXX)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/llama_setup.cmake)
+include_directories(${LLAMA_INCLUDE_DIR})
+link_directories(${LLAMA_LIB_DIR})
+
 set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Qml Quick)
