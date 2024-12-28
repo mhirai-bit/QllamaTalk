@@ -19,6 +19,8 @@ qt6_add_qml_module(content
         chatmessagemodel.h
         llamachatengine.h
         llamachatengine.cpp
+        llamaresponsegenerator.h
+        llamaresponsegenerator.cpp
 )
 target_link_libraries(content PRIVATE
     llama

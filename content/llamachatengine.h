@@ -5,6 +5,7 @@
 #include <QQmlEngine>
 #include "llama.h"
 #include "chatmessagemodel.h"
+#include "llamaresponsegenerator.h"
 
 class LlamaChatEngine: public QObject {
     Q_OBJECT
@@ -27,6 +28,12 @@ public slots:
 
 signals:
     void user_inputChanged();
+    void requestGeneration(const QString &prompt);
+
+private slots:
+    // 生成スレッドからの通知を受け取るスロット
+    void onPartialResponse(const QString &textSoFar);
+    void onGenerationFinished(const QString &finalResponse);
 
 private:
     static constexpr int m_ngl {99};
@@ -36,13 +43,17 @@ private:
     llama_model* m_model;
     llama_context_params m_ctx_params;
     llama_context* m_ctx;
-    llama_sampler* m_sampler;
+
+    LlamaResponseGenerator* m_response_generator;
+
+    bool m_inProgress {false};
+    int m_currentAssistantIndex {-1};
 
     // Exposed to QML
     QString m_user_input;
     ChatMessageModel m_messages;
 
-    auto generate(const std::string &prompt);
+    void generate(const std::string &prompt, std::string& response);
 };
 
 #endif // LLAMACHATENGINE_H

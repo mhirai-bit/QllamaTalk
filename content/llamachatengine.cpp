@@ -1,46 +1,10 @@
+#include <QThread>
 #include "llamachatengine.h"
 
 const std::string LlamaChatEngine::m_model_path {"/Users/mainuser/Documents/Projects/QllamaTalk/3rdparty/llama.cpp/models/Llama-3.1-8B-Open-SFT.Q4_K_M.gguf"};
 
-auto LlamaChatEngine::generate(const std::string& prompt) {
-    std::string response;
+void LlamaChatEngine::generate(const std::string& prompt, std::string& response) {
 
-    const int n_prompt_tokens = -llama_tokenize(m_model, prompt.c_str(), prompt.size(), NULL, 0, true, true);
-    std::vector<llama_token> prompt_tokens(n_prompt_tokens);
-    if (llama_tokenize(m_model, prompt.c_str(), prompt.size(), prompt_tokens.data(), prompt_tokens.size(), llama_get_kv_cache_used_cells(m_ctx) == 0, true) < 0) {
-        GGML_ABORT("failed to tokenize the prompt\n");
-    }
-
-    llama_batch batch = llama_batch_get_one(prompt_tokens.data(), prompt_tokens.size());
-    llama_token new_token_id;
-    while (true) {
-        int n_ctx = llama_n_ctx(m_ctx);
-        int n_ctx_used = llama_get_kv_cache_used_cells(m_ctx);
-
-        if (llama_decode(m_ctx, batch)) {
-            GGML_ABORT("failed to decode\n");
-        }
-
-        new_token_id = llama_sampler_sample(m_sampler, m_ctx, -1);
-
-        if (llama_token_is_eog(m_model, new_token_id)) {
-            break;
-        }
-
-        char buf[256];
-        int n = llama_token_to_piece(m_model, new_token_id, buf, sizeof(buf), 0, true);
-        if (n < 0) {
-            GGML_ABORT("failed to convert token to piece\n");
-        }
-        std::string piece(buf, n);
-        printf("%s", piece.c_str());
-        fflush(stdout);
-        response += piece;
-
-        batch = llama_batch_get_one(&new_token_id, 1);
-    }
-
-    return response;
 }
 
 void LlamaChatEngine::handle_new_user_input() {
@@ -55,7 +19,11 @@ void LlamaChatEngine::handle_new_user_input() {
         return;
     }
 
+    std::vector<llama_chat_message> user_input_message;
+    user_input_message.push_back({"user", strdup(user_input.c_str())});
     messages.push_back({"user", strdup(user_input.c_str())});
+    m_messages.append(user_input_message);
+
     int new_len = llama_chat_apply_template(m_model, nullptr, messages.data(), messages.size(), true, formatted.data(), formatted.size());
     if (new_len > (int)formatted.size()) {
         formatted.resize(new_len);
@@ -67,12 +35,9 @@ void LlamaChatEngine::handle_new_user_input() {
     }
 
     std::string prompt(formatted.begin() + prev_len, formatted.begin() + new_len);
-    std::string response = generate(prompt);
+    emit requestGeneration(prompt.c_str());
 
-    messages.push_back({"assistant", strdup(response.c_str())});
     prev_len = llama_chat_apply_template(m_model, nullptr, messages.data(), messages.size(), false, nullptr, 0);
-
-    m_messages.append(messages);
 
     if (prev_len < 0) {
         fprintf(stderr, "failed to apply the chat template\n");
@@ -80,10 +45,27 @@ void LlamaChatEngine::handle_new_user_input() {
     }
 }
 
+void LlamaChatEngine::onPartialResponse(const QString &textSoFar)
+{
+    if (!m_inProgress) {
+        m_currentAssistantIndex = m_messages.appendSingle("assistant", textSoFar);
+        m_inProgress = true;
+    } else {
+        m_messages.updateMessageContent(m_currentAssistantIndex, textSoFar);
+    }
+}
+
+void LlamaChatEngine::onGenerationFinished(const QString &finalResponse)
+{
+    if (m_inProgress) {
+        m_messages.updateMessageContent(m_currentAssistantIndex, finalResponse);
+        m_inProgress = false;
+        m_currentAssistantIndex = -1;
+    }
+}
+
 LlamaChatEngine::LlamaChatEngine(QObject *parent)
     : QObject(parent), m_messages(this) {
-
-    connect(this, &LlamaChatEngine::user_inputChanged, this, &LlamaChatEngine::handle_new_user_input);
 
     // load dynamic backends
     ggml_backend_load_all();
@@ -101,20 +83,26 @@ LlamaChatEngine::LlamaChatEngine(QObject *parent)
     m_ctx_params.n_ctx = m_n_ctx;
     m_ctx_params.n_batch = m_n_ctx;
 
+
     m_ctx = llama_new_context_with_model(m_model, m_ctx_params);
     if (!m_ctx) {
         fprintf(stderr, "%s: error: failed to create the llama_context\n", __func__);
         return;
     }
 
-    m_sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
-    llama_sampler_chain_add(m_sampler, llama_sampler_init_min_p(0.05f, 1));
-    llama_sampler_chain_add(m_sampler, llama_sampler_init_temp(0.8f));
-    llama_sampler_chain_add(m_sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+    QThread* workerThread = new QThread(this);
+    m_response_generator = new LlamaResponseGenerator(this, m_model, m_ctx);
+    m_response_generator->moveToThread(workerThread);
+
+    workerThread->start();
+
+    connect(this, &LlamaChatEngine::user_inputChanged, this, &LlamaChatEngine::handle_new_user_input);
+    connect(this, &LlamaChatEngine::requestGeneration, m_response_generator, &LlamaResponseGenerator::generate);
+    connect(m_response_generator, &LlamaResponseGenerator::partialResponseReady, this, &LlamaChatEngine::onPartialResponse);
+    connect(m_response_generator, &LlamaResponseGenerator::generationFinished, this, &LlamaChatEngine::onGenerationFinished);
 }
 
 LlamaChatEngine::~LlamaChatEngine() {
-    llama_sampler_free(m_sampler);
     llama_free(m_ctx);
     llama_free_model(m_model);
 }

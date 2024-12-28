@@ -9,10 +9,18 @@ Rectangle {
     id: root
     anchors.fill: parent
     color: "#09102b"
+
+    // Optional: set focus to input on visible
     onVisibleChanged: {
         if (root.visible) {
             _inputField.forceActiveFocus()
         }
+    }
+
+    // QML property to help with dynamic height debugging (if needed)
+    property int test
+    onTestChanged: {
+        console.log("test = ", test)
     }
 
     ListView {
@@ -21,43 +29,46 @@ Rectangle {
         anchors.bottom: _inputField.top
         anchors.left: parent.left
         anchors.right: parent.right
-        model: LlamaChatEngine.messages
         clip: true
+        model: LlamaChatEngine.messages
+
         delegate: Item {
-            height: _imageWrapper.height + 10
+            // top-level item for each message
             width: root.width
+            height: _outerWrapper.height + 10
+
             Item {
-                id: _imageWrapper
+                id: _outerWrapper
+                width: parent.width / 2 - 20
+
+                // The Column below will determine total height
                 height: _messageColumn.height + 20
                 onHeightChanged: {
-                    console.log("ImageWrapper.height = ", height)
+                    console.log("ImageWrapper (outerWrapper).height = ", height)
                 }
 
-                width: parent.width/2 - 20
-                property bool ownMessage: model.sender === "user"
-                anchors{
-                    right: _imageWrapper.ownMessage ? parent.right : undefined
-                    left: _imageWrapper.ownMessage ? undefined : parent.left
-                    rightMargin: _imageWrapper.ownMessage ? 10 : 0
-                    leftMargin: _imageWrapper.ownMessage ? 0 : 10
+                // Decide if it's a user message or assistant
+                property bool ownMessage: (model.sender === "user")
+
+                anchors {
+                    right: _outerWrapper.ownMessage ? parent.right : undefined
+                    left:  _outerWrapper.ownMessage ? undefined   : parent.left
+                    rightMargin: _outerWrapper.ownMessage ? 10 : 0
+                    leftMargin:  _outerWrapper.ownMessage ? 0  : 10
                     verticalCenter: parent.verticalCenter
                 }
 
                 Rectangle {
                     anchors.fill: parent
                     radius: 5
-                    color: _imageWrapper.ownMessage ? "#9d9faa" : "#53586b"
+                    color: _outerWrapper.ownMessage ? "#9d9faa" : "#53586b"
                     border.color:  "#41cd52"
                     border.width: 1
                 }
 
+                // The main content container
                 Column {
                     id: _messageColumn
-                    height: _userName.implicitHeight + delegateLoader.height
-                    onHeightChanged: {
-                        console.log("Column.height = ", height)
-                    }
-
                     anchors {
                         left: parent.left
                         right: parent.right
@@ -66,81 +77,53 @@ Rectangle {
                         verticalCenter: parent.verticalCenter
                     }
 
+                    // Dynamically compute total height from children
+                    height: _userName.implicitHeight + textBody.implicitHeight
+
+                    onHeightChanged: {
+                        console.log("_messageColumn.height =", height)
+                    }
+
+                    // Sender label (You / AI)
                     Text {
                         id: _userName
-                        property string from: _imageWrapper.ownMessage ? qsTr("You") : qsTr("AI")
+                        property string from: _outerWrapper.ownMessage ? qsTr("You") : qsTr("AI")
                         anchors.left: parent.left
                         anchors.right: parent.right
                         font.pointSize: 12
                         font.weight: Font.Bold
                         color: "#f3f3f4"
-                        text: _userName.from + ": "
+                        text: from + ": "
                     }
 
-                    Loader {
-                        id: delegateLoader
+                    // The actual message text
+                    Text {
+                        id: textBody
                         anchors.left: parent.left
                         anchors.right: parent.right
-                        // height: item ? item.height : 0
-                        height: item ? root.test: 0
-                        // Connections {
-                        //     target: item
-                        //     onHeightChanged: {
-                        //         console.log("assigning innerText.height to delegateLoader.height")
-                        //         delegateLoader.height = item.height
-                        //     }
-                        // }
+                        font.pointSize: 12
+                        color: "#f3f3f4"
+                        wrapMode: Text.Wrap
+                        text: model.messageContent
 
-                        sourceComponent: textDelegate
-                        onItemChanged:  {
-                            if (item) {
-                                item.content = model.messageContent
-                                console.log("---------")
-                                console.log(model.sender)
-                                console.log("item.impliciHeight = ", item.implicitHeight)
-                                console.log("item.height = ", item.height)
-                                console.log("delegateLoader.height = ", delegateLoader.height)
-                            }
-                        }
                         onHeightChanged: {
-                            console.log("delegateLoader.height = ", height)
+                            console.log("textBody.height =", height)
+                            console.log("textBody.implicitHeight =", implicitHeight)
+                            // Optional: store in `root.test` if you want to debug
+                            // root.test = textBody.height
                         }
                     }
                 }
             }
         }
+
+        // scroll to end when count changes
         onCountChanged: {
-            Qt.callLater( messageListView.positionViewAtEnd )
+            Qt.callLater(messageListView.positionViewAtEnd)
         }
     }
 
-    property int test
-    onTestChanged: {
-        console.log("test = ", test)
-    }
-
-    Component {
-        id: textDelegate
-        Item {
-            property alias content: innerText.text
-            height: childrenRect.height
-            Text {
-                id: innerText
-                anchors.left: parent.left
-                anchors.right: parent.right
-                height: implicitHeight
-                font.pointSize: 12
-                color: "#f3f3f4"
-                wrapMode: Text.Wrap
-                onHeightChanged: {
-                    console.log("textDelegate.height = ", height)
-                    console.log("textDelegate.implicitHeight = ", implicitHeight)
-                    root.test = innerText.height
-                }
-            }
-        }
-    }
-
+    // Chat input area
     ChatInputField {
         id: _inputField
         focus: true
@@ -157,8 +140,8 @@ Rectangle {
             _inputField.text = ""
         }
 
-        Keys.onPressed: (event)=>  {
-            if (event.key === Qt.Key_V && event.modifiers & Qt.ControlModifier) {
+        Keys.onPressed: (event) =>  {
+            if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)) {
                 console.log("Ctrl + V")
                 switch (LlamaChatEngine.clipBoardContentType) {
                 case LlamaChatEngine.Text:
@@ -168,7 +151,6 @@ Rectangle {
                     LlamaChatEngine.sendImageFromClipboard()
                     break
                 }
-
                 event.accepted = true
             }
         }
