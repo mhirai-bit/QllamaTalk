@@ -6,8 +6,6 @@ option(BUILD_QDS_COMPONENTS "Build design studio components" ON)
 project(QllamaTalkApp LANGUAGES CXX)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/llama_setup.cmake)
-include_directories(${LLAMA_INCLUDE_DIR})
-link_directories(${LLAMA_LIB_DIR})
 
 set(CMAKE_AUTOMOC ON)
 
@@ -18,13 +16,11 @@ if (Qt6_VERSION VERSION_GREATER_EQUAL 6.3)
 endif()
 
 qt_add_executable(QllamaTalkApp src/main.cpp)
-target_include_directories(QllamaTalkApp PRIVATE "/usr/local/include")
 
 qt_add_resources(QllamaTalkApp "configuration"
     PREFIX "/"
     FILES
         qtquickcontrols2.conf
-        3rdparty/llama.cpp/models/Llama-3.1-8B-Open-SFT.Q4_K_M.gguf
 )
 
 target_link_libraries(QllamaTalkApp PRIVATE

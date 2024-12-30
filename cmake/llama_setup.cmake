@@ -1,23 +1,23 @@
 #
 # llama_setup.cmake
 #
-# This file sets up the llama.cpp submodule, checks out the specified commit,
-# configures GPU backends based on OS, builds the library, and installs it
-# into a local folder so that it can be linked by the main project.
+# llama.cpp のサブモジュールを設定し、指定されたコミットへチェックアウトし、
+# すべての GPU バックエンドを無条件で有効化してビルド後にインストールするサンプルです。
+# (Sets up the llama.cpp submodule, checks out a specified commit,
+#  enables all GPU backends unconditionally, and installs after building.)
 #
-# We try to ensure this setup is done only once (or only when needed)
-# in order to avoid repeated builds on every CMake run.
-#
+# 通常、CMake 実行のたびに何度もビルドが走らないよう工夫しています。
+# (We try to avoid rebuilding every time CMake runs.)
 
 # ----------------------------------------------------------------------------
-# 1) Define the path for the llama.cpp submodule
+# 1) llama.cpp のサブモジュールのパスを定義
+#    (Define the path for the llama.cpp submodule)
 # ----------------------------------------------------------------------------
 set(LLAMA_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/llama.cpp")
 
 # ----------------------------------------------------------------------------
-# 2) Update and checkout the correct commit of llama.cpp submodule if needed
-#    (if you want to skip this automatically, you can remove or comment-out
-#    the following execute_process commands.)
+# 2) llama.cpp サブモジュールを更新・特定コミットへチェックアウト
+#    (Update the submodule and checkout the specific commit for llama.cpp)
 # ----------------------------------------------------------------------------
 if(NOT EXISTS "${LLAMA_SOURCE_DIR}/.git")
     message(STATUS "llama_setup: Submodule 'llama.cpp' does not look initialized -> updating submodule")
@@ -31,9 +31,9 @@ if(NOT EXISTS "${LLAMA_SOURCE_DIR}/.git")
     endif()
 endif()
 
-# We only check out the specific commit if it's not already at that commit
-# (This is a simplistic approach - you can refine it if needed.)
+# チェックアウトしたいコミット (The commit to be checked out)
 set(LLAMA_TARGET_COMMIT "30caac3a68a54de8396b21e20ba972554c587230")
+
 execute_process(
     COMMAND git rev-parse HEAD
     WORKING_DIRECTORY "${LLAMA_SOURCE_DIR}"
@@ -53,44 +53,35 @@ if(NOT LLAMA_CURRENT_COMMIT STREQUAL LLAMA_TARGET_COMMIT)
 endif()
 
 # ----------------------------------------------------------------------------
-# 3) Decide GPU backends based on OS (example approach).
-#    You can modify the flags to match llama.cpp's CMake variables if needed.
+# 3) すべての GPU バックエンドを無条件で有効化
+#    (Unconditionally enable all GPU backends)
 # ----------------------------------------------------------------------------
 set(LLAMA_BUILD_DIR "${LLAMA_SOURCE_DIR}/build")
-if(APPLE)
-    message(STATUS "llama_setup: Building on Apple -> enable Metal backend")
-    set(LLAMA_METAL ON)
-elseif(WIN32)
-    message(STATUS "llama_setup: Building on Windows -> enable cuBLAS backend")
-    set(LLAMA_CUBLAS ON)
-elseif(UNIX)
-    message(STATUS "llama_setup: Building on UNIX -> enable OpenCL or other backends")
-    set(LLAMA_OPENCL ON)
-endif()
 
 # ----------------------------------------------------------------------------
-# 4) Build llama.cpp only once if not installed. We'll check if a file or dir
-#    marking a successful build is present. (You can refine the logic as needed.)
+# 4) llama.cpp をビルドしてインストール (一度だけ)
+#    (Build llama.cpp once and install it)
 # ----------------------------------------------------------------------------
-set(LLAMA_INSTALL_DIR "${LLAMA_BUILD_DIR}/install")
+set(LLAMA_INSTALL_DIR "${CMAKE_SOURCE_DIR}/llamacpp_install")
 set(LLAMA_BUILD_STAMP "${LLAMA_BUILD_DIR}/.llama_build_done")
 
 if(NOT EXISTS "${LLAMA_BUILD_STAMP}")
     message(STATUS "llama_setup: Llama library not found in build dir -> configuring & building")
 
-    # Make a build directory if not existing
     file(MAKE_DIRECTORY "${LLAMA_BUILD_DIR}")
 
-    # We can use an ExternalProject or just do a direct CMake call:
-    # Here is a minimal approach using execute_process for demonstration:
-    #  - Adjust the cmake flags to your preference
     execute_process(
         COMMAND "${CMAKE_COMMAND}"
                 -B "${LLAMA_BUILD_DIR}"
                 -S "${LLAMA_SOURCE_DIR}"
-                -DLLAMA_BUILD_METAL=${LLAMA_METAL}
-                -DLLAMA_BUILD_CUBLAS=${LLAMA_CUBLAS}
-                -DLLAMA_BUILD_OPENCL=${LLAMA_OPENCL}
+                -DGGML_METAL=ON     # Metal (Apple GPU)
+                -DGGML_CUDA=ON      # CUDA (NVIDIA GPU)
+                -DGGML_HIP=ON       # HIP (AMD GPU)
+                -DGGML_VULKAN=ON    # Vulkan
+                -DGGML_OPENCL=ON    # OpenCL
+                -DGGML_MUSA=ON      # MUSA (Moore Threads)
+                -DGGML_CANN=ON      # CANN (Ascend NPU)
+                # -DGGML_SYCL=ON    # 必要であれば SYCL も ON (Enable SYCL if needed)
                 -DCMAKE_INSTALL_PREFIX="${LLAMA_INSTALL_DIR}"
         WORKING_DIRECTORY "${LLAMA_BUILD_DIR}"
     )
@@ -99,14 +90,88 @@ if(NOT EXISTS "${LLAMA_BUILD_STAMP}")
         WORKING_DIRECTORY "${LLAMA_BUILD_DIR}"
     )
 
-    # Mark stamp file to skip repeated builds
     file(WRITE "${LLAMA_BUILD_STAMP}" "Llama build success at ${CMAKE_SYSTEM_NAME}")
 else()
     message(STATUS "llama_setup: Llama library is already built -> skipping rebuild")
 endif()
 
 # ----------------------------------------------------------------------------
-# 5) Provide a variable for the llama library path so main project can link it
+# 5) 上位 CMake からリンクしやすくするために、インストールディレクトリを返す
+#    (Set library/install directories to be used in the parent CMake)
 # ----------------------------------------------------------------------------
-set(LLAMA_LIB_DIR "${LLAMA_INSTALL_DIR}/lib" PARENT_SCOPE)
-set(LLAMA_INCLUDE_DIR "${LLAMA_INSTALL_DIR}/include" PARENT_SCOPE)
+set(LLAMA_LIB_DIR "${LLAMA_INSTALL_DIR}/lib")
+set(LLAMA_INCLUDE_DIR "${LLAMA_INSTALL_DIR}/include")
+
+# ----------------------------------------------------------------------------
+# 6) OS 別に、実際のビルド成果物 (.lib / .dll / .dylib / .so) のあるディレクトリを定義
+#    ※ Windows ではフォルダ名を必ず「Debug」に固定
+#    (Define directories containing build artifacts for each OS.
+#     On Windows, always use the "Debug" folder name.)
+# ----------------------------------------------------------------------------
+if(WIN32)
+    # Windows: フォルダ名を絶対に "Debug" に固定
+    # (On Windows, force the output folder to be named "Debug".)
+    set(LLAMA_LIB_FILE_DIR
+        "${LLAMA_BUILD_DIR}/src/Debug"
+    )
+    set(GGML_LIB_FILE_DIR
+        "${LLAMA_BUILD_DIR}/ggml/src/Debug"
+    )
+
+    set(LLAMA_DYNAMIC_LIB_FILE_DIR
+        "${LLAMA_BUILD_DIR}/bin/Debug"
+    )
+    set(GGML_DYNAMIC_LIB_FILE_DIR
+        "${LLAMA_BUILD_DIR}/bin/Debug"
+    )
+elseif(APPLE)
+    # Mac: libllama.dylib -> build/src
+    #      libggml-*.dylib -> build/ggml
+    # (For macOS: .dylib files go to build/src or build/ggml.)
+    set(LLAMA_DYNAMIC_LIB_FILE_DIR
+        "${LLAMA_BUILD_DIR}/src"
+    )
+    set(GGML_DYNAMIC_LIB_FILE_DIR
+        "${LLAMA_BUILD_DIR}/ggml"
+    )
+    set(LLAMA_LIB_FILE_DIR
+        "${LLAMA_BUILD_DIR}/src"
+    )
+    set(GGML_LIB_FILE_DIR
+        "${LLAMA_BUILD_DIR}/ggml"
+    )
+else()
+    # Linux / UNIX 系: .so が build/src, build/ggml に作られる想定
+    # (For Linux/UNIX: .so files in build/src or build/ggml.)
+    set(LLAMA_DYNAMIC_LIB_FILE_DIR
+        "${LLAMA_BUILD_DIR}/src"
+    )
+    set(GGML_DYNAMIC_LIB_FILE_DIR
+        "${LLAMA_BUILD_DIR}/ggml"
+    )
+    set(LLAMA_LIB_FILE_DIR
+        "${LLAMA_BUILD_DIR}/src"
+    )
+    set(GGML_LIB_FILE_DIR
+        "${LLAMA_BUILD_DIR}/ggml"
+    )
+endif()
+
+# ----------------------------------------------------------------------------
+# 7) すべての定義済み変数をデバッグ出力
+#    (Print all defined variables for debugging)
+# ----------------------------------------------------------------------------
+message(STATUS "----- Llama Setup Variables (Debug Print) -----")
+message(STATUS "LLAMA_SOURCE_DIR               = ${LLAMA_SOURCE_DIR}")
+message(STATUS "LLAMA_TARGET_COMMIT            = ${LLAMA_TARGET_COMMIT}")
+message(STATUS "LLAMA_CURRENT_COMMIT           = ${LLAMA_CURRENT_COMMIT}")
+message(STATUS "LLAMA_BUILD_DIR                = ${LLAMA_BUILD_DIR}")
+message(STATUS "LLAMA_INSTALL_DIR              = ${LLAMA_INSTALL_DIR}")
+message(STATUS "LLAMA_BUILD_STAMP              = ${LLAMA_BUILD_STAMP}")
+message(STATUS "LLAMA_LIB_DIR                  = ${LLAMA_LIB_DIR}")
+message(STATUS "LLAMA_INCLUDE_DIR              = ${LLAMA_INCLUDE_DIR}")
+message(STATUS "LLAMA_LIB_FILE_DIR             = ${LLAMA_LIB_FILE_DIR}")
+message(STATUS "GGML_LIB_FILE_DIR              = ${GGML_LIB_FILE_DIR}")
+message(STATUS "LLAMA_DYNAMIC_LIB_FILE_DIR     = ${LLAMA_DYNAMIC_LIB_FILE_DIR}")
+message(STATUS "GGML_DYNAMIC_LIB_FILE_DIR      = ${GGML_DYNAMIC_LIB_FILE_DIR}")
+message(STATUS "------------------------------------------------")
