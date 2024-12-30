@@ -1,4 +1,5 @@
 #include "llamaresponsegenerator.h"
+#include <QDebug>
 
 // Constructor: initializes the response generator with references to the LLaMA model and context.
 LlamaResponseGenerator::LlamaResponseGenerator(QObject *parent,
@@ -56,6 +57,10 @@ void LlamaResponseGenerator::generate(const QString &prompt) {
                                             prompt_tokens.size());
     llama_token new_token_id;
 
+    static constexpr int max_reply_tokens {1024};
+    static constexpr int extra_cutoff_tokens {32};
+    int generated_token_count {0};
+
     // Decode in a loop until the model signals an end-of-generation token.
     while (true) {
         int n_ctx = llama_n_ctx(m_ctx);
@@ -96,6 +101,17 @@ void LlamaResponseGenerator::generate(const QString &prompt) {
 
         // Prepare for next iteration by creating a new batch from the newly sampled token.
         batch = llama_batch_get_one(&new_token_id, 1);
+
+        ++generated_token_count;
+        if (generated_token_count > max_reply_tokens) {
+            if (piece.find('\n') != std::string::npos) {
+                qDebug() << "Cutting off the generation at a newline character.";
+                break;
+            } else if (generated_token_count > max_reply_tokens + extra_cutoff_tokens) {
+                qDebug() << "Cutting off the generation + " << extra_cutoff_tokens << " tokens.";
+                break;
+            }
+        }
     }
 
     // When finished, emit the final response to the main thread for display.

@@ -14,6 +14,11 @@ void LlamaChatEngine::generate(const std::string &prompt, std::string &response)
 // Handles user input changes, updates the model with the user message,
 // and prepares a prompt for generation.
 void LlamaChatEngine::handle_new_user_input() {
+    if(m_inProgress) {
+        qDebug() << "returning as generation is in progress";
+        return;
+    }
+
     // These static variables are used to preserve state across multiple calls.
     static std::vector<llama_chat_message> messages;
     static std::vector<char> formatted(llama_n_ctx(m_ctx));
