@@ -24,7 +24,7 @@ Desktop.ini
 *.qmlc
 *.jsc
 # QtCreatorのビルドディレクトリ（build-*）がプロジェクト直下に生成される場合
-build-*/
+build*
 
 # Visual Studio Code
 .vscode/

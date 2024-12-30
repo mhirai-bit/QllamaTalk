@@ -48,7 +48,7 @@ void LlamaResponseGenerator::generate(const QString &prompt) {
                        llama_get_kv_cache_used_cells(m_ctx) == 0,
                        true) < 0) {
         emit generationError("failed to tokenize the prompt");
-        GGML_ABORT("failed to tokenize the prompt\n");
+        //GGML_ABORT("failed to tokenize the prompt\n");
     }
 
     // Prepare a single batch for decoding.
@@ -64,7 +64,7 @@ void LlamaResponseGenerator::generate(const QString &prompt) {
         // Evaluate the current batch with the LLaMA context.
         if (llama_decode(m_ctx, batch)) {
             emit generationError("failed to decode");
-            GGML_ABORT("failed to decode\n");
+            //GGML_ABORT("failed to decode\n");
         }
 
         // Sample the next token from the logits.
@@ -81,7 +81,7 @@ void LlamaResponseGenerator::generate(const QString &prompt) {
                                      sizeof(buf), 0, true);
         if (n < 0) {
             emit generationError("failed to convert token to piece");
-            GGML_ABORT("failed to convert token to piece\n");
+            //GGML_ABORT("failed to convert token to piece\n");
         }
 
         std::string piece(buf, n);
