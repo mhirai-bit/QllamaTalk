@@ -5,6 +5,7 @@ option(BUILD_QDS_COMPONENTS "Build design studio components" ON)
 
 project(QllamaTalkApp LANGUAGES CXX)
 
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_llama_model.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/llama_setup.cmake)
 
 set(CMAKE_AUTOMOC ON)

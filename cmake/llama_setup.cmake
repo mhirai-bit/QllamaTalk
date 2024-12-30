@@ -70,18 +70,23 @@ if(NOT EXISTS "${LLAMA_BUILD_STAMP}")
 
     file(MAKE_DIRECTORY "${LLAMA_BUILD_DIR}")
 
+    # Apple系OS の場合のみ Metal オプションを付与
+    set(METAL_OPTION "")
+    if(APPLE)
+        set(METAL_OPTION "-DGGML_METAL=ON")
+    endif()
+
     execute_process(
         COMMAND "${CMAKE_COMMAND}"
                 -B "${LLAMA_BUILD_DIR}"
                 -S "${LLAMA_SOURCE_DIR}"
-                -DGGML_METAL=ON     # Metal (Apple GPU)
-                -DGGML_CUDA=ON      # CUDA (NVIDIA GPU)
-                -DGGML_HIP=ON       # HIP (AMD GPU)
-                -DGGML_VULKAN=ON    # Vulkan
-                -DGGML_OPENCL=ON    # OpenCL
-                -DGGML_MUSA=ON      # MUSA (Moore Threads)
-                -DGGML_CANN=ON      # CANN (Ascend NPU)
-                # -DGGML_SYCL=ON    # 必要であれば SYCL も ON (Enable SYCL if needed)
+                ${METAL_OPTION}        # ← Apple OS の時のみ -DGGML_METAL=ON を付与
+                # -DGGML_CUDA=ON      # CUDA (NVIDIA GPU)
+                # -DGGML_HIP=ON       # HIP (AMD GPU)
+                # -DGGML_VULKAN=ON    # Vulkan
+                # -DGGML_OPENCL=ON    # OpenCL
+                # -DGGML_MUSA=ON      # MUSA (Moore Threads)
+                # -DGGML_SYCL=ON      # 必要であれば SYCL も ON (Enable SYCL if needed)
                 -DCMAKE_INSTALL_PREFIX="${LLAMA_INSTALL_DIR}"
         WORKING_DIRECTORY "${LLAMA_BUILD_DIR}"
     )
@@ -110,7 +115,6 @@ set(LLAMA_INCLUDE_DIR "${LLAMA_INSTALL_DIR}/include")
 # ----------------------------------------------------------------------------
 if(WIN32)
     # Windows: フォルダ名を絶対に "Debug" に固定
-    # (On Windows, force the output folder to be named "Debug".)
     set(LLAMA_LIB_FILE_DIR
         "${LLAMA_BUILD_DIR}/src/Debug"
     )
@@ -125,35 +129,33 @@ if(WIN32)
         "${LLAMA_BUILD_DIR}/bin/Debug"
     )
 elseif(APPLE)
-    # Mac: libllama.dylib -> build/src
-    #      libggml-*.dylib -> build/ggml
-    # (For macOS: .dylib files go to build/src or build/ggml.)
+    # macOS: libllama.dylib -> build/src
+    #        libggml-*.dylib -> build/ggml
     set(LLAMA_DYNAMIC_LIB_FILE_DIR
         "${LLAMA_BUILD_DIR}/src"
     )
     set(GGML_DYNAMIC_LIB_FILE_DIR
-        "${LLAMA_BUILD_DIR}/ggml"
+        "${LLAMA_BUILD_DIR}/ggml/src"
     )
     set(LLAMA_LIB_FILE_DIR
         "${LLAMA_BUILD_DIR}/src"
     )
     set(GGML_LIB_FILE_DIR
-        "${LLAMA_BUILD_DIR}/ggml"
+        "${LLAMA_BUILD_DIR}/ggml/src"
     )
 else()
-    # Linux / UNIX 系: .so が build/src, build/ggml に作られる想定
-    # (For Linux/UNIX: .so files in build/src or build/ggml.)
+    # Linux / UNIX 系: .so は build/src, build/ggml に生成される想定
     set(LLAMA_DYNAMIC_LIB_FILE_DIR
         "${LLAMA_BUILD_DIR}/src"
     )
     set(GGML_DYNAMIC_LIB_FILE_DIR
-        "${LLAMA_BUILD_DIR}/ggml"
+        "${LLAMA_BUILD_DIR}/ggml/src"
     )
     set(LLAMA_LIB_FILE_DIR
         "${LLAMA_BUILD_DIR}/src"
     )
     set(GGML_LIB_FILE_DIR
-        "${LLAMA_BUILD_DIR}/ggml"
+        "${LLAMA_BUILD_DIR}/ggml/src"
     )
 endif()
 
