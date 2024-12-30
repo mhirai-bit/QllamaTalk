@@ -1,6 +1,5 @@
 # QllamaTalk
 QllamaTalk is an experimental AI chatbot application that demonstrates how to integrate Qt and llama in a single project.  
-[Mac Usage Example Video](assets_for_readme/Desktop_Usage_Example.mov)  
 ![Mac Usage Example Screenshot](assets_for_readme/Desktop_Usage_Example.png)
 
 ## Environment
