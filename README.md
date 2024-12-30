@@ -21,11 +21,11 @@ QllamaTalk has been tested on the following setups:
 
 3. **Open `CMakeLists.txt` in Qt Creator**  
    - Choose one of the Kits specified in the “Environment” section.
-   - The build process automatically updates the `llama.cpp` submodule and compiles it.
+   - The cmake configuration and generation process automatically updates the `llama.cpp` submodule and compiles it.
      - On macOS, [llama_setup.cmake](cmake/llama_setup.cmake) enables Metal for inference.
      - On other platforms, it defaults to CPU-based inference.  
      - **Note (for other than macOS)**: CPU-only inference can be slow and may heavily use the CPU. If you want to enable GPU acceleration on another platform, refer to the [llama.cpp build instructions](https://github.com/ggerganov/llama.cpp/blob/master/docs/build.md) and modify `llama_setup.cmake` accordingly.
-   - The build process also automatically downloads the default model. This model’s filename is currently hardcoded in the `LlamaChatEngine::m_model_path` function within [llamachatengine.cpp](content/llamachatengine.cpp) and [content/CMakeLists.txt](content/CMakeLists.txt). To use a different model, place it in the **content/llama_models** folder and update the model name in both files.
+   - The cmake configuration and generation process also automatically downloads the default model. This model’s filename is currently hardcoded in the `LlamaChatEngine::m_model_path` function within [llamachatengine.cpp](content/llamachatengine.cpp) and [content/CMakeLists.txt](content/CMakeLists.txt). To use a different model, place it in the **content/llama_models** folder and update the model name in both files.
    
 4. **Build and run the application**  
    - In Qt Creator, press the **Build and Run** button (or use the **Ctrl+R** / **Cmd+R** shortcut).  
