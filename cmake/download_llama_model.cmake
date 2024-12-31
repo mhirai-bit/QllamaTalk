@@ -10,10 +10,6 @@ cmake_minimum_required(VERSION 3.16)
 # URL とファイル名を条件によって切り替える
 if(IOS)
     # iOS用: より小さい 3B モデル
-    # set(LLAMA_MODEL_URL "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q6_K_L.gguf?download=true")
-    # set(LLAMA_MODEL_NAME "Llama-3.2-3B-Instruct-Q6_K_L.gguf")
-    # set(LLAMA_MODEL_URL "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_0_8_8.gguf?download=true")
-    # set(LLAMA_MODEL_NAME "Llama-3.2-3B-Instruct-Q4_0_8_8.gguf")
     set(LLAMA_MODEL_URL "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-IQ3_M.gguf?download=true")
     set(LLAMA_MODEL_NAME "Llama-3.2-3B-Instruct-IQ3_M.gguf")
 else()

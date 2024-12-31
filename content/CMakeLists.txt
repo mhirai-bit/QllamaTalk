@@ -3,6 +3,11 @@
 
 qt_add_library(content STATIC)
 
+# C++からggufファイルを参照できるようにする。
+target_compile_definitions(content PRIVATE
+    LLAMA_MODEL_FILE="${LLAMA_MODEL_NAME}"
+)
+
 # ----------------------------------------------------------------------------
 # 変数の説明（例）:
 #   - LLAMA_LIB_FILE_DIR, GGML_LIB_FILE_DIR:

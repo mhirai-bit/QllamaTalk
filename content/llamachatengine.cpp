@@ -3,7 +3,11 @@
 
 // The path to the LLaMA model we load by default.
 const std::string LlamaChatEngine::m_model_path {
-"Llama-3.2-3B-Instruct-IQ3_M.gguf"
+#ifdef LLAMA_MODEL_FILE
+    LLAMA_MODEL_FILE
+#else
+#error "LLAMA_MODEL_FILE is not defined. Please define it via target_compile_definitions() in CMake."
+#endif
 };
 
 // This function is kept as a placeholder for potential synchronous generation usage.
