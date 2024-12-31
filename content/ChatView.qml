@@ -114,7 +114,7 @@ Rectangle {
             margins: 20
         }
 
-        placeholderText: qsTr("Start typing here or paste an image")
+        placeholderText: qsTr("Start typing here...")
         onAccepted: {
             LlamaChatEngine.setUser_input(_inputField.text)
             _inputField.text = ""
