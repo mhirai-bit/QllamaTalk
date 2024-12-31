@@ -3,7 +3,7 @@
 
 // The path to the LLaMA model we load by default.
 const std::string LlamaChatEngine::m_model_path {
-    "llama-3.1-8b-open-sft-q4_k_m.gguf"
+"Llama-3.2-3B-Instruct-IQ3_M.gguf"
 };
 
 // This function is kept as a placeholder for potential synchronous generation usage.

@@ -17,6 +17,7 @@ if (Qt6_VERSION VERSION_GREATER_EQUAL 6.3)
 endif()
 
 qt_add_executable(QllamaTalkApp src/main.cpp)
+target_compile_definitions(QllamaTalkApp PRIVATE LLAMA_MODEL_FILE=\"${LLAMA_MODEL_NAME}\")
 
 qt_add_resources(QllamaTalkApp "configuration"
     PREFIX "/"

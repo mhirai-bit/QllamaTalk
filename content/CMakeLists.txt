@@ -19,107 +19,22 @@ qt_add_library(content STATIC)
 # Windows / macOS / Linux など、OSによってサフィックスが異なるため
 # find_library の NAMES に複数指定するなど、工夫できる場合もありますが、
 # ここでは llamacpp_install の中にインストールされる "ライブラリ名" を仮定して進めます。
-
-find_library(LLAMA_LIB
-    NAMES llama            # Windows: llama.lib, Unix系: libllama.a / libllama.so / libllama.dylib
-    PATHS
+if(NOT IOS)
+    find_library(LLAMA_LIB
+        NAMES llama            # Windows: llama.lib, Unix系: libllama.a / libllama.so / libllama.dylib
+        PATHS
         "${LLAMA_LIB_FILE_DIR}"
         # もし追加で探したい場所があれば、ここに追記
-    NO_DEFAULT_PATH
-)
+        NO_DEFAULT_PATH
+    )
 
 find_library(GGML_LIB
     NAMES ggml
     PATHS
-        "${GGML_LIB_FILE_DIR}"
-        # もし追加で探したい場所があれば、ここに追記
+    "${GGML_LIB_FILE_DIR}"
+    # もし追加で探したい場所があれば、ここに追記
     NO_DEFAULT_PATH
 )
-
-# インクルードディレクトリを追加
-target_include_directories(content PRIVATE
-    ${CMAKE_SOURCE_DIR}/3rdparty/llama.cpp/include
-    ${CMAKE_SOURCE_DIR}/3rdparty/llama.cpp/ggml/include
-)
-
-# Windows の場合は .dll を、他OS の場合は .dylib / .so をコピーする処理
-if(WIN32)
-    # -----------------------------------------------------
-    # llama.dll のコピー
-    # -----------------------------------------------------
-    add_custom_command(TARGET content POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${LLAMA_DYNAMIC_LIB_FILE_DIR}/llama.dll"  # ここで llama.dll としているが、実際の名前に合わせてください
-            "$<TARGET_FILE_DIR:QllamaTalkApp>"
-        COMMENT "Copying llama.dll to QllamaTalkApp"
-    )
-    # -----------------------------------------------------
-    # ggml*.dll のコピー (複数種類ある場合を想定)
-    # -----------------------------------------------------
-    file(GLOB GGML_DLLS
-        "${GGML_DYNAMIC_LIB_FILE_DIR}/ggml*.dll"
-    )
-    foreach(dll_file ${GGML_DLLS})
-        add_custom_command(TARGET content POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${dll_file}"
-                "$<TARGET_FILE_DIR:QllamaTalkApp>"
-            COMMENT "Copying ggml DLLs to QllamaTalkApp"
-        )
-    endforeach()
-
-elseif(APPLE)
-    # macOS 場合: llama.cpp が "libllama.dylib" / "libggml-x-y.dylib" 等を生成する想定
-    # -----------------------------------------------------
-    # libllama.dylib のコピー
-    # -----------------------------------------------------
-    add_custom_command(TARGET content POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${LLAMA_DYNAMIC_LIB_FILE_DIR}/libllama.dylib"
-            "$<TARGET_FILE_DIR:QllamaTalkApp>"
-        COMMENT "Copying libllama.dylib to QllamaTalkApp"
-    )
-    # -----------------------------------------------------
-    # libggml-*.dylib のコピー (複数ある場合を想定)
-    # -----------------------------------------------------
-    file(GLOB GGML_DYLIBS
-        "${GGML_DYNAMIC_LIB_FILE_DIR}/libggml*.dylib"
-    )
-    foreach(dylib_file ${GGML_DYLIBS})
-        add_custom_command(TARGET content POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${dylib_file}"
-                "$<TARGET_FILE_DIR:QllamaTalkApp>"
-            COMMENT "Copying libggml*.dylib to QllamaTalkApp"
-        )
-    endforeach()
-
-else()
-    # Linux / UNIX 系の場合: "libllama.so", "libggml-xxx.so" など
-    # -----------------------------------------------------
-    # libllama.so のコピー
-    # -----------------------------------------------------
-    add_custom_command(TARGET content POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${LLAMA_DYNAMIC_LIB_FILE_DIR}/libllama.so"
-            "$<TARGET_FILE_DIR:QllamaTalkApp>"
-        COMMENT "Copying libllama.so to QllamaTalkApp"
-    )
-    # -----------------------------------------------------
-    # libggml-*.so のコピー (複数ある場合を想定)
-    # -----------------------------------------------------
-    file(GLOB GGML_SOS
-        "${GGML_DYNAMIC_LIB_FILE_DIR}/libggml*.so"
-    )
-    foreach(so_file ${GGML_SOS})
-        add_custom_command(TARGET content POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${so_file}"
-                "$<TARGET_FILE_DIR:QllamaTalkApp>"
-            COMMENT "Copying libggml*.so to QllamaTalkApp"
-        )
-    endforeach()
-endif()
 
 # 見つからなかった場合はエラー
 if(LLAMA_LIB)
@@ -134,36 +49,179 @@ else()
     message(FATAL_ERROR "Could not find ggml library (e.g. ggml.lib / libggml.dylib / libggml.so)")
 endif()
 
+set(ALL_LIBS
+    ${LLAMA_LIB}
+    ${GGML_LIB}
+)
+endif()
+
+# インクルードディレクトリを追加
+target_include_directories(content PRIVATE
+    ${CMAKE_SOURCE_DIR}/3rdparty/llama.cpp/include
+    ${CMAKE_SOURCE_DIR}/3rdparty/llama.cpp/ggml/include
+)
+
+# Windows の場合は .dll を、他OS の場合は .dylib / .so をコピーする処理
+if(WIN32)
+    # -----------------------------------------------------
+    # llama.dll のコピー
+    # -----------------------------------------------------
+    add_custom_command(TARGET content POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${LLAMA_DYNAMIC_LIB_FILE_DIR}/llama.dll"  # ここで llama.dll としているが、実際の名前に合わせてください
+        "$<TARGET_FILE_DIR:QllamaTalkApp>"
+        COMMENT "Copying llama.dll to QllamaTalkApp"
+    )
+# -----------------------------------------------------
+# ggml*.dll のコピー (複数種類ある場合を想定)
+# -----------------------------------------------------
+file(GLOB GGML_DLLS
+    "${GGML_DYNAMIC_LIB_FILE_DIR}/ggml*.dll"
+)
+foreach(dll_file ${GGML_DLLS})
+    add_custom_command(TARGET content POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${dll_file}"
+        "$<TARGET_FILE_DIR:QllamaTalkApp>"
+        COMMENT "Copying ggml DLLs to QllamaTalkApp"
+    )
+endforeach()
+
+elseif(APPLE)
+    if(IOS)
+        # llama_setup.cmake 側で build_iOS の中に libllama.a が生成されているはず
+        # かつライブラリ名が "libllama.a" であることがわかっているので、手動でパスを設定する
+        set(LLAMA_STATIC_PATH "${LLAMA_LIB_FILE_DIR}/libllama.a")
+        if(EXISTS "${LLAMA_STATIC_PATH}")
+            set(LLAMA_LIB "${LLAMA_STATIC_PATH}")
+            message(STATUS "Using libllama.a for iOS: ${LLAMA_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find llama static library (libllama.a) in ${LLAMA_LIB_FILE_DIR}")
+        endif()
+
+        # ggml 側も同様に静的ライブラリを探す(もし ggml も静的なら libggml.a 等)
+        file(GLOB GGML_STATIC_LIBS
+            "${GGML_LIB_FILE_DIR}/libggml*.a"  # 例: libggml.a, libggml-base.a, libggml-cpu.a, libggml-metal.a など
+        )
+        # ggml-metalとggml-blasも追加
+        list(APPEND GGML_STATIC_LIBS
+            "${GGML_LIB_FILE_DIR}/ggml-metal/libggml-metal.a"
+            "${GGML_LIB_FILE_DIR}/ggml-blas/libggml-blas.a")
+
+    find_library(METAL Metal)
+    find_library(ACCELERATE Accelerate)
+
+    if(METAL)
+        message(STATUS "Found Metal library: ${METAL}")
+    else()
+        message(FATAL_ERROR "Could not find Metal library")
+    endif()
+
+    if(ACCELERATE)
+        message(STATUS "Found Accelerate library: ${ACCELERATE}")
+    else()
+        message(FATAL_ERROR "Could not find Accelerate library")
+    endif()
+
+    if(GGML_STATIC_LIBS)
+        message(STATUS "Found ggml static libraries for iOS:")
+        foreach(libfile ${GGML_STATIC_LIBS})
+            message(STATUS "  - ${libfile}")
+        endforeach()
+    else()
+        message(FATAL_ERROR "Could not find any libggml*.a in ${GGML_LIB_FILE_DIR}")
+    endif()
+
+    # llama / ggml ライブラリのリストをまとめる
+    # 先に llama (libllama.a) を入れた後、ggml系を全部追加
+    set(ALL_LIBS
+        ${LLAMA_STATIC_PATH}
+        ${GGML_STATIC_LIBS}
+        ${METAL}
+        ${ACCELERATE}
+    )
+else()
+    # macOS 場合: llama.cpp が "libllama.dylib" / "libggml-x-y.dylib" 等を生成する想定
+    # -----------------------------------------------------
+    # libllama.dylib のコピー
+    # -----------------------------------------------------
+    add_custom_command(TARGET content POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${LLAMA_DYNAMIC_LIB_FILE_DIR}/libllama.dylib"
+        "$<TARGET_FILE_DIR:QllamaTalkApp>"
+        COMMENT "Copying libllama.dylib to QllamaTalkApp"
+    )
+# -----------------------------------------------------
+# libggml-*.dylib のコピー (複数ある場合を想定)
+# -----------------------------------------------------
+file(GLOB GGML_DYLIBS
+    "${GGML_DYNAMIC_LIB_FILE_DIR}/libggml*.dylib"
+)
+foreach(dylib_file ${GGML_DYLIBS})
+    add_custom_command(TARGET content POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${dylib_file}"
+        "$<TARGET_FILE_DIR:QllamaTalkApp>"
+        COMMENT "Copying libggml*.dylib to QllamaTalkApp"
+    )
+endforeach()
+endif()
+else()
+    # Linux / UNIX 系の場合: "libllama.so", "libggml-xxx.so" など
+    # -----------------------------------------------------
+    # libllama.so のコピー
+    # -----------------------------------------------------
+    add_custom_command(TARGET content POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${LLAMA_DYNAMIC_LIB_FILE_DIR}/libllama.so"
+        "$<TARGET_FILE_DIR:QllamaTalkApp>"
+        COMMENT "Copying libllama.so to QllamaTalkApp"
+    )
+# -----------------------------------------------------
+# libggml-*.so のコピー (複数ある場合を想定)
+# -----------------------------------------------------
+file(GLOB GGML_SOS
+    "${GGML_DYNAMIC_LIB_FILE_DIR}/libggml*.so"
+)
+foreach(so_file ${GGML_SOS})
+    add_custom_command(TARGET content POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${so_file}"
+        "$<TARGET_FILE_DIR:QllamaTalkApp>"
+        COMMENT "Copying libggml*.so to QllamaTalkApp"
+    )
+endforeach()
+endif()
+
 qt6_add_qml_module(content
     URI "content"
     VERSION 1.0
     RESOURCE_PREFIX "/qt/qml"
     QML_FILES
-        App.qml
-        Screen01.ui.qml
-        ChatView.qml
-        ChatInputField.qml
+    App.qml
+    Screen01.ui.qml
+    ChatView.qml
+    ChatInputField.qml
     RESOURCES
-        fonts/fonts.txt
+    fonts/fonts.txt
     SOURCES
-        chatmessagemodel.cpp
-        chatmessagemodel.h
-        llamachatengine.h
-        llamachatengine.cpp
-        llamaresponsegenerator.h
-        llamaresponsegenerator.cpp
+    chatmessagemodel.cpp
+    chatmessagemodel.h
+    llamachatengine.h
+    llamachatengine.cpp
+    llamaresponsegenerator.h
+    llamaresponsegenerator.cpp
 )
 
 target_link_libraries(content PRIVATE
-    ${LLAMA_LIB}
-    ${GGML_LIB}
+    ${ALL_LIBS}
 )
 
 # モデルファイル (gguf) のコピー命令も残す
 add_custom_command(
     TARGET content POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_LIST_DIR}/llama_models/llama-3.1-8b-open-sft-q4_k_m.gguf"
-        "$<TARGET_FILE_DIR:QllamaTalkApp>"
-    COMMENT "Copying llama-3.1-8b-open-sft-q4_k_m.gguf next to the QllamaTalkApp binary"
+    "${CMAKE_CURRENT_LIST_DIR}/llama_models/${LLAMA_MODEL_NAME}"
+    "$<TARGET_FILE_DIR:QllamaTalkApp>"
+    COMMENT "Copying ${LLAMA_MODEL_NAME} next to the QllamaTalkApp binary"
 )
