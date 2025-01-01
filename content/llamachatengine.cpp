@@ -1,4 +1,5 @@
 #include <QThread>
+#include <QtConcurrent>
 #include "llamachatengine.h"
 
 // The path to the LLaMA model we load by default.
@@ -13,6 +14,35 @@ const std::string LlamaChatEngine::m_model_path {
 // This function is kept as a placeholder for potential synchronous generation usage.
 void LlamaChatEngine::generate(const std::string &prompt, std::string &response) {
     // Currently not used. Could be implemented for blocking generation if necessary.
+}
+
+void LlamaChatEngine::doEngineInit()
+{
+    // Load ggml backends (e.g. CPU, Metal).
+    ggml_backend_load_all();
+
+    m_model_params = llama_model_default_params();
+    m_model_params.n_gpu_layers = m_ngl;
+
+    m_model = llama_load_model_from_file(m_model_path.c_str(), m_model_params);
+    if (!m_model) {
+        fprintf(stderr, "%s: error: unable to load model\n", __func__);
+        return;
+    }
+
+    m_ctx_params = llama_context_default_params();
+    m_ctx_params.n_ctx = m_n_ctx;
+    m_ctx_params.n_batch = m_n_ctx;
+
+    m_ctx = llama_new_context_with_model(m_model, m_ctx_params);
+    if (!m_ctx) {
+        fprintf(stderr, "%s: error: failed to create the llama_context\n", __func__);
+        return;
+    }
+
+    QMetaObject::invokeMethod(this, [this] {
+        onEngineInitFinished();
+    }, Qt::QueuedConnection);
 }
 
 // Handles user input changes, updates the model with the user message,
@@ -100,32 +130,8 @@ void LlamaChatEngine::onGenerationFinished(const QString &finalResponse) {
     }
 }
 
-// Constructor loads the model and context, then starts a worker thread for generation.
-LlamaChatEngine::LlamaChatEngine(QObject *parent)
-    : QObject(parent), m_messages(this) {
-
-    // Load ggml backends (e.g. CPU, Metal).
-    ggml_backend_load_all();
-
-    m_model_params = llama_model_default_params();
-    m_model_params.n_gpu_layers = m_ngl;
-
-    m_model = llama_load_model_from_file(m_model_path.c_str(), m_model_params);
-    if (!m_model) {
-        fprintf(stderr, "%s: error: unable to load model\n", __func__);
-        return;
-    }
-
-    m_ctx_params = llama_context_default_params();
-    m_ctx_params.n_ctx = m_n_ctx;
-    m_ctx_params.n_batch = m_n_ctx;
-
-    m_ctx = llama_new_context_with_model(m_model, m_ctx_params);
-    if (!m_ctx) {
-        fprintf(stderr, "%s: error: failed to create the llama_context\n", __func__);
-        return;
-    }
-
+void LlamaChatEngine::onEngineInitFinished()
+{
     // Set up a dedicated QThread for LlamaResponseGenerator.
     QThread* workerThread = new QThread(this);
     m_response_generator = new LlamaResponseGenerator(nullptr, m_model, m_ctx);
@@ -149,6 +155,27 @@ LlamaChatEngine::LlamaChatEngine(QObject *parent)
     // Clean up the worker objects when the thread finishes.
     connect(workerThread, &QThread::finished,
             m_response_generator, &QObject::deleteLater);
+
+    setEngine_initialized(true);
+}
+
+bool LlamaChatEngine::engine_initialized() const
+{
+    return m_engine_initialized;
+}
+
+void LlamaChatEngine::setEngine_initialized(bool newEngine_initialized)
+{
+    if (m_engine_initialized == newEngine_initialized)
+        return;
+    m_engine_initialized = newEngine_initialized;
+    emit engine_initializedChanged();
+}
+
+// Constructor loads the model and context, then starts a worker thread for generation.
+LlamaChatEngine::LlamaChatEngine(QObject *parent)
+    : QObject(parent), m_messages(this) {
+    QtConcurrent::run(&LlamaChatEngine::doEngineInit, this);
 }
 
 // Destructor frees the LLaMA context and model.

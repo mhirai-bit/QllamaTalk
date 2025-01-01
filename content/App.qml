@@ -3,6 +3,7 @@
 
 import QtQuick 6.2
 import QllamaTalk
+import content
 
 Window {
     width: Screen.width

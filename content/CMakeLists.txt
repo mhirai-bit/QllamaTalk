@@ -1,4 +1,5 @@
 qt_add_library(content STATIC)
+find_package(Qt6 REQUIRED COMPONENTS Concurrent)
 
 # ----------------------------------------------------------------------------
 # C++コードからダウンロード済みの gguf モデルファイル名を参照できるようにする
@@ -216,6 +217,7 @@ qt6_add_qml_module(content
 # ----------------------------------------------------------------------------
 target_link_libraries(content PRIVATE
     ${ALL_LIBS}
+    Qt6::Concurrent
 )
 
 # ----------------------------------------------------------------------------
