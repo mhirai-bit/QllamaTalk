@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: LicenseRef-Qt-Commercial OR BSD-3-Clause
 
 import QtQuick
+import QtQuick.Controls
 import content
 
 Rectangle {
@@ -15,6 +16,22 @@ Rectangle {
         if (root.visible) {
             _inputField.forceActiveFocus()
         }
+    }
+
+    BusyIndicator {
+        id: loadingSpinner
+        anchors.centerIn: parent
+        // engine_initialized == false の間だけ表示 & 回転させる
+        visible: !LlamaChatEngine.engine_initialized
+        running: !LlamaChatEngine.engine_initialized
+    }
+
+    Text {
+        id: loadingText
+        anchors.centerIn: parent
+        text: qsTr("Loading AI...")
+        visible: !LlamaChatEngine.engine_initialized
+        color: "#f3f3f4"
     }
 
     ListView {
@@ -107,6 +124,7 @@ Rectangle {
     ChatInputField {
         id: _inputField
         focus: true
+        enabled: LlamaChatEngine.engine_initialized
         anchors {
             left: parent.left
             right: parent.right
@@ -114,7 +132,7 @@ Rectangle {
             margins: 20
         }
 
-        placeholderText: qsTr("Start typing here or paste an image")
+        placeholderText: qsTr("Start typing here...")
         onAccepted: {
             LlamaChatEngine.setUser_input(_inputField.text)
             _inputField.text = ""
