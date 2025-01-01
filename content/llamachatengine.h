@@ -98,10 +98,6 @@ private:
     // エンジン初期化フラグ
     bool m_engine_initialized {false};
 
-    // Optional synchronous generation placeholder
-    // 同期生成のプレースホルダ
-    void generate(const std::string &prompt, std::string &response);
-
     // Actual heavy init process (async)
     // 実際の重い初期化処理（非同期）
     void doEngineInit();

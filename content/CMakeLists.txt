@@ -111,7 +111,6 @@ elseif(APPLE)
             "${GGML_LIB_FILE_DIR}/ggml-blas/libggml-blas.a"
         )
 
-        find_library(METAL Metal)
         find_library(ACCELERATE Accelerate)
 
         if(METAL)
@@ -139,7 +138,6 @@ elseif(APPLE)
         set(ALL_LIBS
             ${LLAMA_STATIC_PATH}
             ${GGML_STATIC_LIBS}
-            ${METAL}
             ${ACCELERATE}
         )
     else()
