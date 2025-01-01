@@ -18,6 +18,12 @@ endif()
 
 qt_add_executable(QllamaTalkApp src/main.cpp)
 target_compile_definitions(QllamaTalkApp PRIVATE LLAMA_MODEL_FILE=\"${LLAMA_MODEL_NAME}\")
+if(IOS)
+    set_target_properties(QllamaTalkApp
+        PROPERTIES
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/platforms/ios/Info.plist"
+            QT_IOS_LAUNCH_SCREEN "${CMAKE_CURRENT_SOURCE_DIR}/platforms/ios/LaunchScreen.storyboard")
+endif()
 
 qt_add_resources(QllamaTalkApp "configuration"
     PREFIX "/"
