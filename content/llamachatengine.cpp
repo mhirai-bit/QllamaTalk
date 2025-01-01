@@ -216,13 +216,6 @@ ChatMessageModel* LlamaChatEngine::messages() {
     return &m_messages;
 }
 
-// Placeholder for potential synchronous generation in the future
-// 将来的に同期的なテキスト生成を行う可能性があるためのプレースホルダ関数
-void LlamaChatEngine::generate(const std::string &prompt, std::string &response) {
-    // Not used currently
-    // 現在は使用していません
-}
-
 // Loads the default LLaMA model path (defined via CMake)
 // デフォルトのLLaMAモデルパスを読み込む（CMakeで定義）
 const std::string LlamaChatEngine::m_model_path {
