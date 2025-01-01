@@ -1,58 +1,67 @@
 #include "llamaresponsegenerator.h"
 #include <QDebug>
 
-// Constructor: initializes the response generator with references to the LLaMA model and context.
+// Constructor: initializes the response generator with references to the LLaMA model and context
+// コンストラクタ: LLaMAモデルとコンテキストへの参照でレスポンスジェネレータを初期化
 LlamaResponseGenerator::LlamaResponseGenerator(QObject *parent,
                                                llama_model *model,
                                                llama_context *ctx)
     : QObject(parent), m_model(model), m_ctx(ctx) {
 }
 
-// Initializes the sampler with default parameters (temperature, min_p, etc.).
-void LlamaResponseGenerator::initializeSampler() {
-    m_sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
-    llama_sampler_chain_add(m_sampler, llama_sampler_init_min_p(0.05f, 1));
-    llama_sampler_chain_add(m_sampler, llama_sampler_init_temp(0.8f));
-    llama_sampler_chain_add(m_sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
-}
-
-// Destructor: cleans up the sampler if it has been created.
+// Destructor: cleans up the sampler if it has been created
+// デストラクタ: サンプラーが作成されていた場合はクリーンアップ
 LlamaResponseGenerator::~LlamaResponseGenerator() {
     if (m_sampler) {
         llama_sampler_free(m_sampler);
     }
 }
 
-// Called in the worker thread to generate text from a given prompt.
-// Emits partial and final responses as they become available.
+// Called in the worker thread to generate text from a given prompt
+// ワーカースレッド内で、指定したプロンプトからテキストを生成する
 void LlamaResponseGenerator::generate(const QString &prompt) {
-    // If this is the first generation, set up the sampler.
+    // If this is the first generation, set up the sampler
+    // 初回生成ならサンプラーを初期化
     if (!m_sampler) {
         initializeSampler();
     }
 
-    // Convert Qstring to std::string for use with the LLaMA API.
+    // Convert QString to std::string for use with LLaMA API
+    // LLaMA APIで使用するためQStringをstd::stringに変換
     std::string response;
     std::string promptStd = prompt.toStdString();
 
-    // Tokenize the prompt text. Negative sign indicates returning the token count, ignoring special tokens.
-    const int n_prompt_tokens = -llama_tokenize(m_model, promptStd.c_str(),
-                                                prompt.size(), nullptr, 0,
-                                                true, true);
+    // Tokenize prompt text. Negative indicates returning token count, ignoring special tokens
+    // プロンプトテキストをトークン化。負数で呼ぶと特別トークンを無視したトークン数のみ返却
+    const int n_prompt_tokens = -llama_tokenize(
+        m_model,
+        promptStd.c_str(),
+        prompt.size(),
+        nullptr,
+        0,
+        true,  // is_prefix
+        true   // is_bos
+        );
 
-    // Prepare a vector to hold the tokenized prompt.
+    // Prepare vector for tokenized prompt
+    // トークン化結果を格納するベクタを準備
     std::vector<llama_token> prompt_tokens(n_prompt_tokens);
 
-    // Tokenize again, this time storing tokens in the vector.
-    if (llama_tokenize(m_model, promptStd.c_str(), promptStd.size(),
-                       prompt_tokens.data(), prompt_tokens.size(),
-                       llama_get_kv_cache_used_cells(m_ctx) == 0,
-                       true) < 0) {
+    // Tokenize again, now storing tokens in the vector
+    // もう一度トークン化し、今度はベクタに格納
+    if (llama_tokenize(
+            m_model,
+            promptStd.c_str(),
+            promptStd.size(),
+            prompt_tokens.data(),
+            prompt_tokens.size(),
+            llama_get_kv_cache_used_cells(m_ctx) == 0,
+            true) < 0) {
         emit generationError("failed to tokenize the prompt");
-        //GGML_ABORT("failed to tokenize the prompt\n");
     }
 
-    // Prepare a single batch for decoding.
+    // Prepare a single batch for decoding
+    // デコード用のバッチを1つ用意
     llama_batch batch = llama_batch_get_one(prompt_tokens.data(),
                                             prompt_tokens.size());
     llama_token new_token_id;
@@ -61,59 +70,79 @@ void LlamaResponseGenerator::generate(const QString &prompt) {
     static constexpr int extra_cutoff_tokens {32};
     int generated_token_count {0};
 
-    // Decode in a loop until the model signals an end-of-generation token.
+    // Decode in a loop until an end-of-generation token is reached
+    // 終了トークンが出るまでループしながらデコード
     while (true) {
-        int n_ctx = llama_n_ctx(m_ctx);
-        int n_ctx_used = llama_get_kv_cache_used_cells(m_ctx);
+        const int n_ctx      = llama_n_ctx(m_ctx);
+        const int n_ctx_used = llama_get_kv_cache_used_cells(m_ctx);
 
-        // Evaluate the current batch with the LLaMA context.
+        // Evaluate the batch
+        // バッチを評価
         if (llama_decode(m_ctx, batch)) {
             emit generationError("failed to decode");
-            //GGML_ABORT("failed to decode\n");
+            break;
         }
 
-        // Sample the next token from the logits.
+        // Sample the next token
+        // 次のトークンをサンプリング
         new_token_id = llama_sampler_sample(m_sampler, m_ctx, -1);
 
-        // If we've reached an end-of-generation token, break.
+        // Check if end-of-generation token
+        // 終了トークンならループを抜ける
         if (llama_token_is_eog(m_model, new_token_id)) {
             break;
         }
 
-        // Convert the token to text. 'buf' is zero-initialized to avoid leftover characters.
+        // Convert token to text
+        // トークンを文字列に変換
         char buf[256] = {};
         int n = llama_token_to_piece(m_model, new_token_id, buf,
                                      sizeof(buf), 0, true);
         if (n < 0) {
             emit generationError("failed to convert token to piece");
-            //GGML_ABORT("failed to convert token to piece\n");
+            break;
         }
 
         std::string piece(buf, n);
         printf("%s", piece.c_str());
         fflush(stdout);
 
-        // Accumulate partial text in 'response'.
+        // Accumulate partial text
+        // 部分的なテキストを蓄積
         response += piece;
 
-        // Emit partial progress so the UI can update.
+        // Notify partial response
+        // 部分的なレスポンスを通知
         emit partialResponseReady(QString::fromStdString(response));
 
-        // Prepare for next iteration by creating a new batch from the newly sampled token.
+        // Prepare next batch
+        // 次のバッチを準備
         batch = llama_batch_get_one(&new_token_id, 1);
 
         ++generated_token_count;
         if (generated_token_count > max_reply_tokens) {
             if (piece.find('\n') != std::string::npos) {
-                qDebug() << "Cutting off the generation at a newline character.";
+                qDebug() << "Cutting off the generation at a newline character";
                 break;
             } else if (generated_token_count > max_reply_tokens + extra_cutoff_tokens) {
-                qDebug() << "Cutting off the generation + " << extra_cutoff_tokens << " tokens.";
+                qDebug() << "Cutting off the generation +"
+                         << extra_cutoff_tokens
+                         << " tokens";
                 break;
             }
         }
     }
 
-    // When finished, emit the final response to the main thread for display.
+    // Done: emit final response
+    // 完了: 最終レスポンスを通知
     emit generationFinished(QString::fromStdString(response));
+}
+
+// Initializes the sampler with default parameters
+// サンプラーをデフォルトパラメータで初期化
+void LlamaResponseGenerator::initializeSampler() {
+    m_sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    llama_sampler_chain_add(m_sampler, llama_sampler_init_min_p(0.05f, 1));
+    llama_sampler_chain_add(m_sampler, llama_sampler_init_temp(0.8f));
+    llama_sampler_chain_add(m_sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 }

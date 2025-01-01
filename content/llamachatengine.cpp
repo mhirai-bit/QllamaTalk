@@ -2,55 +2,11 @@
 #include <QtConcurrent>
 #include "llamachatengine.h"
 
-// Loads the default LLaMA model path (defined via CMake)
-// 将来的に同期的なテキスト生成を行う可能性があるためのプレースホルダ関数
-const std::string LlamaChatEngine::m_model_path {
-#ifdef LLAMA_MODEL_FILE
-    LLAMA_MODEL_FILE
-#else
-#error "LLAMA_MODEL_FILE is not defined. Please define it via target_compile_definitions() in CMake."
-#endif
-};
-
-// Placeholder for potential synchronous generation in the future
-// 将来的に同期的なテキスト生成を行う可能性があるためのプレースホルダ関数
-void LlamaChatEngine::generate(const std::string &prompt, std::string &response) {
-    // Not used currently
-    // 現在は使用していません
-}
-
-// Asynchronous engine initialization: loads backends, model, and context
-// 非同期のエンジン初期化処理: バックエンドやモデル、コンテキストをロード
-void LlamaChatEngine::doEngineInit()
-{
-    // Load ggml backends (CPU, Metal, etc.)
-    // ggml のバックエンドを読み込み（CPU, Metal など）
-    ggml_backend_load_all();
-
-    m_model_params = llama_model_default_params();
-    m_model_params.n_gpu_layers = m_ngl;
-
-    m_model = llama_load_model_from_file(m_model_path.c_str(), m_model_params);
-    if (!m_model) {
-        fprintf(stderr, "%s: error: unable to load model\n", __func__);
-        return;
-    }
-
-    m_ctx_params = llama_context_default_params();
-    m_ctx_params.n_ctx   = m_n_ctx;
-    m_ctx_params.n_batch = m_n_ctx;
-
-    m_ctx = llama_new_context_with_model(m_model, m_ctx_params);
-    if (!m_ctx) {
-        fprintf(stderr, "%s: error: failed to create the llama_context\n", __func__);
-        return;
-    }
-
-    // Once initialization is done, notify UI thread
-    // 初期化完了後、UIスレッドに通知
-    QMetaObject::invokeMethod(this, [this] {
-        onEngineInitFinished();
-    }, Qt::QueuedConnection);
+// Constructor: starts asynchronous init in a separate thread
+// コンストラクタ: 非同期の初期化を別スレッドで開始
+LlamaChatEngine::LlamaChatEngine(QObject *parent)
+    : QObject(parent), m_messages(this) {
+    QtConcurrent::run(&LlamaChatEngine::doEngineInit, this);
 }
 
 // Handles user input: appends user message to model, applies template, then requests generation
@@ -174,6 +130,40 @@ void LlamaChatEngine::onEngineInitFinished()
     setEngine_initialized(true);
 }
 
+// Asynchronous engine initialization: loads backends, model, and context
+// 非同期のエンジン初期化処理: バックエンドやモデル、コンテキストをロード
+void LlamaChatEngine::doEngineInit()
+{
+    // Load ggml backends (CPU, Metal, etc.)
+    // ggml のバックエンドを読み込み（CPU, Metal など）
+    ggml_backend_load_all();
+
+    m_model_params = llama_model_default_params();
+    m_model_params.n_gpu_layers = m_ngl;
+
+    m_model = llama_load_model_from_file(m_model_path.c_str(), m_model_params);
+    if (!m_model) {
+        fprintf(stderr, "%s: error: unable to load model\n", __func__);
+        return;
+    }
+
+    m_ctx_params = llama_context_default_params();
+    m_ctx_params.n_ctx   = m_n_ctx;
+    m_ctx_params.n_batch = m_n_ctx;
+
+    m_ctx = llama_new_context_with_model(m_model, m_ctx_params);
+    if (!m_ctx) {
+        fprintf(stderr, "%s: error: failed to create the llama_context\n", __func__);
+        return;
+    }
+
+    // Once initialization is done, notify UI thread
+    // 初期化完了後、UIスレッドに通知
+    QMetaObject::invokeMethod(this, [this] {
+        onEngineInitFinished();
+    }, Qt::QueuedConnection);
+}
+
 // Engine initialization status: read-only in QML
 // エンジンの初期化状態: QMLで読み取り専用
 bool LlamaChatEngine::engine_initialized() const
@@ -189,13 +179,6 @@ void LlamaChatEngine::setEngine_initialized(bool newEngine_initialized)
         return;
     m_engine_initialized = newEngine_initialized;
     emit engine_initializedChanged();
-}
-
-// Constructor: starts asynchronous init in a separate thread
-// コンストラクタ: 非同期の初期化を別スレッドで開始
-LlamaChatEngine::LlamaChatEngine(QObject *parent)
-    : QObject(parent), m_messages(this) {
-    QtConcurrent::run(&LlamaChatEngine::doEngineInit, this);
 }
 
 // Destructor: frees llama context and model
@@ -232,3 +215,20 @@ void LlamaChatEngine::resetUser_input() {
 ChatMessageModel* LlamaChatEngine::messages() {
     return &m_messages;
 }
+
+// Placeholder for potential synchronous generation in the future
+// 将来的に同期的なテキスト生成を行う可能性があるためのプレースホルダ関数
+void LlamaChatEngine::generate(const std::string &prompt, std::string &response) {
+    // Not used currently
+    // 現在は使用していません
+}
+
+// Loads the default LLaMA model path (defined via CMake)
+// デフォルトのLLaMAモデルパスを読み込む（CMakeで定義）
+const std::string LlamaChatEngine::m_model_path {
+#ifdef LLAMA_MODEL_FILE
+    LLAMA_MODEL_FILE
+#else
+#error "LLAMA_MODEL_FILE is not defined. Please define it via target_compile_definitions() in CMake."
+#endif
+};
