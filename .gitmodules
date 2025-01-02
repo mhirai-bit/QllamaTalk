@@ -4,3 +4,6 @@
 [submodule "3rdparty/llama.cpp"]
 	path = 3rdparty/llama.cpp
 	url = https://github.com/ggerganov/llama.cpp.git
+[submodule "LLMServerQtRemoteObjects"]
+	path = LLMServerQtRemoteObjects
+	url = git@github.com:mhirai-bit/LLMServerQtRemoteObjects.git
