@@ -7,7 +7,7 @@ project(QllamaTalkApp LANGUAGES CXX)
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_llama_model.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/llama_setup.cmake)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/QtRemoteObjectsLLMServer)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/LLMServerQtRemoteObjects)
 
 set(CMAKE_AUTOMOC ON)
 

@@ -1,8 +1,0 @@
-#include <QtCore>
-class LlamaResponseGenerator
-{
-    SLOT(generate(const QString &request);
-    SIGNAL(partialResponseReady(const QString &textSoFar));
-    SIGNAL(generationFinished(const QString &finalResponse));
-    SIGNAL(generationError(const QString &errorMessage));
-}
