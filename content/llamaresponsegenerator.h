@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include "llama.h"
+#include "rep_LlamaResponseGenerator_replica.h"
 
 // This class handles text generation for LLaMA-based models.
 // It is typically used in a worker thread to generate responses asynchronously.
@@ -25,7 +26,7 @@ public:
 
 public slots:
     // Generates text from the provided prompt, emitting partial and final results.
-    void generate(const QString &prompt);
+    void generate(const QList<LlamaChatMessage>& messages);
 
 signals:
     // Emitted periodically with incremental output during generation.
@@ -45,6 +46,7 @@ private:
 
     // Initializes the sampler (temperature, min_p, etc.) before text generation.
     void initializeSampler();
+    std::vector<llama_chat_message> toLlamaMessages(const QList<LlamaChatMessage> &userMessages);
 };
 
 #endif // LLAMA_RESPONSE_GENERATOR_H

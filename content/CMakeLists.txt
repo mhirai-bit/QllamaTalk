@@ -119,12 +119,6 @@ elseif(APPLE)
 
         find_library(ACCELERATE Accelerate)
 
-        if(METAL)
-            message(STATUS "Found Metal library: ${METAL}")
-        else()
-            message(FATAL_ERROR "Could not find Metal library")
-        endif()
-
         if(ACCELERATE)
             message(STATUS "Found Accelerate library: ${ACCELERATE}")
         else()

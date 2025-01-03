@@ -19,24 +19,50 @@ LlamaResponseGenerator::~LlamaResponseGenerator() {
 
 // Called in the worker thread to generate text from a given prompt
 // ワーカースレッド内で、指定したプロンプトからテキストを生成する
-void LlamaResponseGenerator::generate(const QString &prompt) {
+void LlamaResponseGenerator::generate(const QList<LlamaChatMessage>& messages) {
     // If this is the first generation, set up the sampler
     // 初回生成ならサンプラーを初期化
     if (!m_sampler) {
         initializeSampler();
     }
 
+    qDebug() << "About to QMetaObject::invokeMethod(generate) with messages size = " << messages.size();
+
+    static std::vector<char> formatted(llama_n_ctx(m_ctx));
+    static int prev_len {0};
+
+    std::vector<llama_chat_message> messages_for_llama = toLlamaMessages(messages);
+
+    // Apply chat template
+    // チャットテンプレートを適用
+    int new_len = llama_chat_apply_template(
+        m_model, nullptr, messages_for_llama.data(), messages_for_llama.size(),
+        true, formatted.data(), formatted.size()
+        );
+    if (new_len > static_cast<int>(formatted.size())) {
+        formatted.resize(new_len);
+        new_len = llama_chat_apply_template(
+            m_model, nullptr, messages_for_llama.data(), messages_for_llama.size(),
+            true, formatted.data(), formatted.size()
+            );
+    }
+    if (new_len < 0) {
+        fprintf(stderr, "Failed to apply chat template.\n");
+        return;
+    }
+
+    std::string promptStd(formatted.begin() + prev_len, formatted.begin() + new_len);
+
     // Convert QString to std::string for use with LLaMA API
     // LLaMA APIで使用するためQStringをstd::stringに変換
     std::string response;
-    std::string promptStd = prompt.toStdString();
 
     // Tokenize prompt text. Negative indicates returning token count, ignoring special tokens
     // プロンプトテキストをトークン化。負数で呼ぶと特別トークンを無視したトークン数のみ返却
     const int n_prompt_tokens = -llama_tokenize(
         m_model,
         promptStd.c_str(),
-        prompt.size(),
+        promptStd.size(),
         nullptr,
         0,
         true,  // is_prefix
@@ -133,10 +159,37 @@ void LlamaResponseGenerator::generate(const QString &prompt) {
         }
     }
 
+    // Update prev_len
+    // prev_len を更新
+    prev_len = llama_chat_apply_template(
+        m_model, nullptr, messages_for_llama.data(), messages_for_llama.size(),
+        false, nullptr, 0
+        );
+    if (prev_len < 0) {
+        fprintf(stderr, "Failed to apply chat template.\n");
+    }
+
     // Done: emit final response
     // 完了: 最終レスポンスを通知
     emit generationFinished(QString::fromStdString(response));
 }
+
+// userMessages (QList<LlamaChatMessage>) → llamaMessages (std::vector<llama_chat_message>)
+std::vector<llama_chat_message> LlamaResponseGenerator::toLlamaMessages(const QList<LlamaChatMessage> &userMessages)
+{
+    std::vector<llama_chat_message> llamaMessages;
+    llamaMessages.reserve(userMessages.size());
+
+    for (const auto &um : userMessages) {
+        llama_chat_message lm;
+        lm.role = strdup(um.role().toUtf8().constData());
+        lm.content = strdup(um.content().toUtf8().constData());
+        llamaMessages.push_back(lm);
+    }
+
+    return llamaMessages;
+}
+
 
 // Initializes the sampler with default parameters
 // サンプラーをデフォルトパラメータで初期化
