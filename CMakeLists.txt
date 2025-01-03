@@ -12,7 +12,6 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/LLMServerQtRemoteObjects)
 set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Qml Quick)
-find_package(Qt6 REQUIRED COMPONENTS RemoteObjects)
 
 if (Qt6_VERSION VERSION_GREATER_EQUAL 6.3)
     qt_standard_project_setup()
@@ -35,10 +34,6 @@ if(IOS)
         PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
 endif()
 
-qt6_add_repc_replicas(QllamaTalkApp
-    ${CMAKE_CURRENT_LIST_DIR}/QtRemoteObjectsFiles/LlamaResponseGenerator.rep
-)
-
 qt_add_resources(QllamaTalkApp "configuration"
     PREFIX "/"
     FILES
@@ -50,7 +45,6 @@ target_link_libraries(QllamaTalkApp PRIVATE
     Qt6::Gui
     Qt6::Qml
     Qt6::Quick
-    Qt6::RemoteObjects
 )
 
 if (BUILD_QDS_COMPONENTS)

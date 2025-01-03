@@ -1,87 +1,100 @@
 #include <QThread>
 #include <QtConcurrent>
+#include <QRemoteObjectNode>
 #include "llamachatengine.h"
+#include "llamaresponsegenerator.h"
+#include "rep_LlamaResponseGenerator_replica.h"
 
-// Constructor: starts asynchronous init in a separate thread
+// Constructor: starts asynchronous init in another thread
 // コンストラクタ: 非同期の初期化を別スレッドで開始
 LlamaChatEngine::LlamaChatEngine(QObject *parent)
-    : QObject(parent), m_messages(this) {
+    : QObject(parent)
+    , m_messages(this)
+{
     QtConcurrent::run(&LlamaChatEngine::doEngineInit, this);
 }
 
-// Handles user input: appends user message to model, applies template, then requests generation
-// ユーザー入力を処理: ユーザーメッセージをモデルに追加し、テンプレートを適用して生成をリクエスト
-void LlamaChatEngine::handle_new_user_input() {
-    if(m_inProgress) {
-        qDebug() << "Returning because generation is in progress";
+// Switch engine mode
+// エンジンモードを切り替える
+void LlamaChatEngine::switchEngineMode(EngineMode newMode)
+{
+    if (newMode == m_currentEngineMode) {
+        // Already in this mode, do nothing
+        // 既に同じモードなので何もしない
+        return;
+    }
+    if (m_inProgress) {
+        // Defer switch until generation finishes
+        // 生成が完了するまで切り替えを保留
+        m_pendingEngineSwitchMode = newMode;
+        return;
+    }
+    doImmediateEngineSwitch(newMode);
+}
+
+// Handles new user input (applies chat template, emits requestGeneration)
+// ユーザー入力の処理（チャットテンプレート適用、requestGenerationをemit）
+void LlamaChatEngine::handle_new_user_input()
+{
+    if (m_inProgress) {
+        qDebug() << "Generation in progress, ignoring new input.";
         return;
     }
 
-    // Static vars: hold conversation state across multiple calls
-    // 静的変数: 複数回の呼び出し間で会話状態を保持
     static std::vector<llama_chat_message> messages;
     static std::vector<char> formatted(llama_n_ctx(m_ctx));
     static int prev_len {0};
 
-    std::string user_input = m_user_input.toStdString();
-    if (user_input.empty()) {
+    std::string userText = m_user_input.toStdString();
+    if (userText.empty()) {
         return;
     }
 
-    // Add user message to both local vector and QML model
-    // ユーザーメッセージをローカルのベクタとQMLモデル両方に追加
-    std::vector<llama_chat_message> user_input_message;
-    user_input_message.push_back({"user", strdup(user_input.c_str())});
-    messages.push_back({"user", strdup(user_input.c_str())});
-    m_messages.append(user_input_message);
+    // Append user message to local/state
+    // ユーザーメッセージをローカルに追加
+    std::vector<llama_chat_message> userInputMsg;
+    userInputMsg.push_back({"user", strdup(userText.c_str())});
+    messages.push_back({"user", strdup(userText.c_str())});
+    m_messages.append(userInputMsg);
 
     // Apply chat template
     // チャットテンプレートを適用
-    int new_len = llama_chat_apply_template(m_model,
-                                            nullptr,
-                                            messages.data(),
-                                            messages.size(),
-                                            true,
-                                            formatted.data(),
-                                            formatted.size());
+    int new_len = llama_chat_apply_template(
+        m_model, nullptr, messages.data(), messages.size(),
+        true, formatted.data(), formatted.size()
+        );
     if (new_len > static_cast<int>(formatted.size())) {
         formatted.resize(new_len);
-        new_len = llama_chat_apply_template(m_model,
-                                            nullptr,
-                                            messages.data(),
-                                            messages.size(),
-                                            true,
-                                            formatted.data(),
-                                            formatted.size());
+        new_len = llama_chat_apply_template(
+            m_model, nullptr, messages.data(), messages.size(),
+            true, formatted.data(), formatted.size()
+            );
     }
     if (new_len < 0) {
-        fprintf(stderr, "failed to apply the chat template\n");
+        fprintf(stderr, "Failed to apply chat template.\n");
         return;
     }
 
-    // Extract newly added text as prompt
-    // 新たに追加された部分を取り出してプロンプトとする
+    // Emit requestGeneration with new prompt segment
+    // 新しいプロンプト部分を含めて requestGeneration をemit
     std::string prompt(formatted.begin() + prev_len, formatted.begin() + new_len);
     emit requestGeneration(QString::fromStdString(prompt));
 
-    // Update prev_len for next chunk
-    // 次のチャンクに備えて prev_len を更新
-    prev_len = llama_chat_apply_template(m_model,
-                                         nullptr,
-                                         messages.data(),
-                                         messages.size(),
-                                         false,
-                                         nullptr,
-                                         0);
+    // Update prev_len
+    // prev_len を更新
+    prev_len = llama_chat_apply_template(
+        m_model, nullptr, messages.data(), messages.size(),
+        false, nullptr, 0
+        );
     if (prev_len < 0) {
-        fprintf(stderr, "failed to apply the chat template\n");
-        return;
+        fprintf(stderr, "Failed to apply chat template.\n");
     }
 }
 
-// Partially received AI response: create assistant message if first chunk, or update existing
-// 部分的に受け取ったAI応答: 最初のチャンクはメッセージ作成、それ以降は更新
-void LlamaChatEngine::onPartialResponse(const QString &textSoFar) {
+// Receives partial AI response (first chunk -> new message, otherwise update)
+// 部分的なAI応答を受け取る（最初のチャンクならメッセージ新規、以降は更新）
+void LlamaChatEngine::onPartialResponse(const QString &textSoFar)
+{
     if (!m_inProgress) {
         m_currentAssistantIndex = m_messages.appendSingle("assistant", textSoFar);
         m_inProgress = true;
@@ -90,52 +103,116 @@ void LlamaChatEngine::onPartialResponse(const QString &textSoFar) {
     }
 }
 
-// Final AI response: update message content, reset generation state
-// AI応答が完了: メッセージ内容を更新し、生成状態をリセット
-void LlamaChatEngine::onGenerationFinished(const QString &finalResponse) {
+// Called after AI generation finishes (resets state, checks pending mode switch)
+// AI生成完了後に呼ばれる（状態リセット、保留中の切り替えがあれば処理）
+void LlamaChatEngine::onGenerationFinished(const QString &finalResponse)
+{
     if (m_inProgress) {
         m_messages.updateMessageContent(m_currentAssistantIndex, finalResponse);
         m_inProgress = false;
         m_currentAssistantIndex = -1;
     }
+
+    // If pending engine switch, do it now
+    // 保留中のエンジン切り替えがあれば実行
+    if (m_pendingEngineSwitchMode.has_value()) {
+        EngineMode pendingMode = *m_pendingEngineSwitchMode;
+        m_pendingEngineSwitchMode.reset();
+        doImmediateEngineSwitch(pendingMode);
+    }
 }
 
-// Called in UI thread once engine init is done. Sets up worker thread and marks engine as initialized
-// エンジン初期化完了後にUIスレッドで呼ばれる。ワーカースレッドをセットアップして初期化済みフラグを立てる
+// Called on UI thread after engine init (prepare local/remote engines, default local)
+// エンジン初期化完了後にUIスレッドで呼ばれる（ローカル/リモートエンジン用意、デフォルトはローカル）
 void LlamaChatEngine::onEngineInitFinished()
 {
-    QThread* workerThread = new QThread(this);
-    m_response_generator = new LlamaResponseGenerator(nullptr, m_model, m_ctx);
-    m_response_generator->moveToThread(workerThread);
+    // Prepare local engine
+    m_localGenerator = new LlamaResponseGenerator(nullptr, m_model, m_ctx);
+    m_localWorkerThread = new QThread(this);
+    m_localGenerator->moveToThread(m_localWorkerThread);
+    connect(m_localWorkerThread, &QThread::finished, m_localGenerator, &QObject::deleteLater);
+    m_localWorkerThread->start();
 
-    workerThread->start();
+    // Prepare remote engine
+    QRemoteObjectNode *node = new QRemoteObjectNode(this);
+    node->connectToNode(QUrl("local:myRemoteEngine")); // Example
+    m_remoteGenerator = node->acquire<LlamaResponseGeneratorReplica>();
+    if (!m_remoteGenerator) {
+        // Handle error
+        // エラー処理
+    }
+    m_remoteGenerator->setParent(this);
 
     connect(this, &LlamaChatEngine::user_inputChanged,
             this, &LlamaChatEngine::handle_new_user_input);
 
-    connect(this, &LlamaChatEngine::requestGeneration,
-            m_response_generator, &LlamaResponseGenerator::generate);
+    // Default to local
+    // デフォルトをローカルに
+    m_currentEngineMode = Mode_Local;
+    doImmediateEngineSwitch(m_currentEngineMode);
 
-    connect(m_response_generator, &LlamaResponseGenerator::partialResponseReady,
-            this, &LlamaChatEngine::onPartialResponse);
-
-    connect(m_response_generator, &LlamaResponseGenerator::generationFinished,
-            this, &LlamaChatEngine::onGenerationFinished);
-
-    connect(workerThread, &QThread::finished,
-            m_response_generator, &QObject::deleteLater);
-
-    // Mark engine as initialized
-    // エンジンを初期化済みとマーク
     setEngine_initialized(true);
 }
 
-// Asynchronous engine initialization: loads backends, model, and context
-// 非同期のエンジン初期化処理: バックエンドやモデル、コンテキストをロード
+// Immediately switch local/remote engines (disconnect old, connect new)
+// ローカル/リモートを即切り替え（古い接続を切り、新しいエンジンに接続）
+void LlamaChatEngine::doImmediateEngineSwitch(EngineMode newMode)
+{
+    if (newMode == m_currentEngineMode) {
+        qDebug() << "Already in this mode:" << newMode << ", skipping.";
+        return;
+    }
+
+    // Disconnect old engine
+    // 古いエンジンとの接続を切断
+    disconnect(this, &LlamaChatEngine::requestGeneration, nullptr, nullptr);
+
+    if (newMode == Mode_Local) {
+        // Disconnect remote signals
+        disconnect(m_remoteGenerator, &LlamaResponseGeneratorReplica::partialResponseReady,
+                   this, &LlamaChatEngine::onPartialResponse);
+        disconnect(m_remoteGenerator, &LlamaResponseGeneratorReplica::generationFinished,
+                   this, &LlamaChatEngine::onGenerationFinished);
+
+        // Connect local signals
+        connect(this, &LlamaChatEngine::requestGeneration,
+                m_localGenerator, [this](const QString &prompt) {
+                    QMetaObject::invokeMethod(m_localGenerator, "generate",
+                                              Qt::QueuedConnection,
+                                              Q_ARG(QString, prompt));
+                });
+        connect(m_localGenerator, &LlamaResponseGenerator::partialResponseReady,
+                this, &LlamaChatEngine::onPartialResponse);
+        connect(m_localGenerator, &LlamaResponseGenerator::generationFinished,
+                this, &LlamaChatEngine::onGenerationFinished);
+
+        qDebug() << "[EngineSwitch] Now using LOCAL engine.";
+    } else {
+        // Disconnect local signals
+        disconnect(m_localGenerator, &LlamaResponseGenerator::partialResponseReady,
+                   this, &LlamaChatEngine::onPartialResponse);
+        disconnect(m_localGenerator, &LlamaResponseGenerator::generationFinished,
+                   this, &LlamaChatEngine::onGenerationFinished);
+
+        // Connect remote signals
+        connect(this, &LlamaChatEngine::requestGeneration,
+                m_remoteGenerator, &LlamaResponseGeneratorReplica::generate);
+        connect(m_remoteGenerator, &LlamaResponseGeneratorReplica::partialResponseReady,
+                this, &LlamaChatEngine::onPartialResponse);
+        connect(m_remoteGenerator, &LlamaResponseGeneratorReplica::generationFinished,
+                this, &LlamaChatEngine::onGenerationFinished);
+
+        qDebug() << "[EngineSwitch] Now using REMOTE engine.";
+    }
+
+    m_currentEngineMode = newMode;
+    qDebug() << "[EngineSwitch] doImmediateEngineSwitch -> newMode =" << newMode;
+}
+
+// Runs in another thread, loads ggml backends and llama model/context
+// 別スレッドで実行、ggmlのバックエンドやllamaのモデル/コンテキストをロード
 void LlamaChatEngine::doEngineInit()
 {
-    // Load ggml backends (CPU, Metal, etc.)
-    // ggml のバックエンドを読み込み（CPU, Metal など）
     ggml_backend_load_all();
 
     m_model_params = llama_model_default_params();
@@ -143,36 +220,34 @@ void LlamaChatEngine::doEngineInit()
 
     m_model = llama_load_model_from_file(m_model_path.c_str(), m_model_params);
     if (!m_model) {
-        fprintf(stderr, "%s: error: unable to load model\n", __func__);
+        fprintf(stderr, "Error: unable to load model.\n");
         return;
     }
 
     m_ctx_params = llama_context_default_params();
-    m_ctx_params.n_ctx   = m_n_ctx;
+    m_ctx_params.n_ctx = m_n_ctx;
     m_ctx_params.n_batch = m_n_ctx;
 
     m_ctx = llama_new_context_with_model(m_model, m_ctx_params);
     if (!m_ctx) {
-        fprintf(stderr, "%s: error: failed to create the llama_context\n", __func__);
+        fprintf(stderr, "Error: failed to create llama_context.\n");
         return;
     }
 
-    // Once initialization is done, notify UI thread
-    // 初期化完了後、UIスレッドに通知
     QMetaObject::invokeMethod(this, [this] {
         onEngineInitFinished();
     }, Qt::QueuedConnection);
 }
 
-// Engine initialization status: read-only in QML
-// エンジンの初期化状態: QMLで読み取り専用
+// Check if engine is initialized
+// エンジンが初期化完了か判定
 bool LlamaChatEngine::engine_initialized() const
 {
     return m_engine_initialized;
 }
 
-// Private setter for engine_initialized: only we can change it
-// engine_initialized のプライベートセッター: このクラス内だけで変更可能
+// Private setter for engine_initialized
+// engine_initializedフラグをプライベートにセット
 void LlamaChatEngine::setEngine_initialized(bool newEngine_initialized)
 {
     if (m_engine_initialized == newEngine_initialized)
@@ -181,22 +256,25 @@ void LlamaChatEngine::setEngine_initialized(bool newEngine_initialized)
     emit engine_initializedChanged();
 }
 
-// Destructor: frees llama context and model
-// デストラクタ: llama のコンテキストとモデルを解放
-LlamaChatEngine::~LlamaChatEngine() {
+// Destructor: free llama context/model
+// デストラクタ: llamaのコンテキスト/モデルを解放
+LlamaChatEngine::~LlamaChatEngine()
+{
     llama_free(m_ctx);
     llama_free_model(m_model);
 }
 
-// Returns user_input
-// user_inputを返す
-QString LlamaChatEngine::user_input() const {
+// Getter for user_input
+// user_inputのゲッター
+QString LlamaChatEngine::user_input() const
+{
     return m_user_input;
 }
 
-// Sets new user_input, notifies QML
-// user_inputを更新し、QMLに通知
-void LlamaChatEngine::setUser_input(const QString &newUser_input) {
+// Setter for user_input
+// user_inputのセッター
+void LlamaChatEngine::setUser_input(const QString &newUser_input)
+{
     if (m_user_input == newUser_input) {
         return;
     }
@@ -204,20 +282,22 @@ void LlamaChatEngine::setUser_input(const QString &newUser_input) {
     emit user_inputChanged();
 }
 
-// Resets user_input to empty
-// user_input を空にリセット
-void LlamaChatEngine::resetUser_input() {
+// Reset user_input to empty
+// user_inputを空にリセット
+void LlamaChatEngine::resetUser_input()
+{
     setUser_input({});
 }
 
-// Exposes the ChatMessageModel to QML
-// ChatMessageModelをQMLに公開
-ChatMessageModel* LlamaChatEngine::messages() {
+// Return ChatMessageModel
+// ChatMessageModelを返す
+ChatMessageModel* LlamaChatEngine::messages()
+{
     return &m_messages;
 }
 
-// Loads the default LLaMA model path (defined via CMake)
-// デフォルトのLLaMAモデルパスを読み込む（CMakeで定義）
+// Default model path defined via CMake
+// デフォルトモデルパス（CMakeで定義）
 const std::string LlamaChatEngine::m_model_path {
 #ifdef LLAMA_MODEL_FILE
     LLAMA_MODEL_FILE

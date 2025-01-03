@@ -1,5 +1,11 @@
 qt_add_library(content STATIC)
-find_package(Qt6 REQUIRED COMPONENTS Concurrent)
+find_package(Qt6 REQUIRED COMPONENTS Concurrent RemoteObjects)
+
+qt6_add_repc_replicas(content
+    ../LLMServerQtRemoteObjects/QtRemoteObjectsFiles/LlamaResponseGenerator.rep
+)
+message(STATUS "rep file path = ${CMAKE_CURRENT_SOURCE_DIR}/LLMServerQtRemoteObjects/QtRemoteObjectsFiles/LlamaResponseGenerator.rep")
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 # ----------------------------------------------------------------------------
 # C++コードからダウンロード済みの gguf モデルファイル名を参照できるようにする
@@ -216,6 +222,7 @@ qt6_add_qml_module(content
 target_link_libraries(content PRIVATE
     ${ALL_LIBS}
     Qt6::Concurrent
+    Qt6::RemoteObjects
 )
 
 # ----------------------------------------------------------------------------
