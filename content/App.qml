@@ -1,9 +1,10 @@
-// main.qml (例)
-// 必要に応じて import は調整
+// main.qml
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.VectorImage
+import QtQuick.Controls
+
 import QllamaTalk
 import content
 
@@ -16,94 +17,118 @@ ApplicationWindow {
 
     property bool isRemote: LlamaChatEngine.currentEngineMode === LlamaChatEngine.Mode_Remote
 
-    Connections {
-        target: LlamaChatEngine
-        onEngineModeChanged: {
-            console.log("Engine mode changed: " + LlamaChatEngine.currentEngineMode)
-        }
-    }
-
     // ヘッダー部分
-    header: Row {
-        spacing: 12
+    header: Item {
+        width: parent.width
+        height: headerRow.height
 
-        VectorImage {
-            id: onlineOfflineIcon
-            source: mainWindow.isRemote ? "icons/online.svg" : "icons/offline.svg"
+        Row {
+            id: headerRow
+            leftPadding: 8
+            spacing: 8
+
+            VectorImage {
+                id: onlineOfflineIcon
+                // isRemote に基づいてアイコンを切り替え
+                source: mainWindow.isRemote ? "icons/online.svg" : "icons/offline.svg"
+            }
+
+            Text {
+                // isRemote なら ip_address:port_number を表示
+                text: mainWindow.isRemote
+                    ? qsTr("Remote") + " " + LlamaChatEngine.ip_address + ":" + LlamaChatEngine.port_number
+                    : qsTr("Local")
+                anchors.verticalCenter: onlineOfflineIcon.verticalCenter
+            }
         }
 
-        Text {
-            text: mainWindow.isRemote ? qsTr("Remote") : qsTr("Local")
-            anchors.verticalCenter: onlineOfflineIcon.verticalCenter
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {
+                settingsDrawer.open()
+            }
         }
-
     }
-
 
     // メインのチャットビュー
     ChatView {
         id: mainScreen
         anchors.fill: parent
-        // 必要に応じてマージンや padding を調整
     }
 
-    // Drawer（右からスライドする設定画面の例）
+    // Drawer
     Drawer {
         id: settingsDrawer
         edge: Qt.LeftEdge
-        width: parent.width * 0.6
+        width: drawerContent.width
         height: parent.height
 
-        // Drawer 内のレイアウト
         Column {
             id: drawerContent
-            anchors.fill: parent
             spacing: 16
             padding: 20
 
             Text {
+                id: connectionSettingText
                 text: qsTr("Connection Settings")
                 font.bold: true
                 font.pointSize: 16
             }
 
-            // エンジンモード切り替え (ローカル / リモート)
             Row {
+                id: engineModeRow
                 spacing: 8
-                Text { text: qsTr("Engine Mode:") }
+                Text {
+                    id: modeLabel
+                    text: qsTr("Engine Mode:")
+                    anchors.verticalCenter: modeCombo.verticalCenter
+                }
                 ComboBox {
                     id: modeCombo
+                    width: modeLabel.width * 1.5
                     model: [qsTr("Local"), qsTr("Remote")]
                     currentIndex: mainWindow.isRemote ? 1 : 0
                 }
             }
 
-            // IP入力フィールド
+            // IP入力フィールド (regularExpressionValidatorの例)
             TextField {
                 id: ipField
+                width: engineModeRow.width
                 placeholderText: qsTr("Enter server IP (e.g. 192.168.0.220)")
+                enabled: modeCombo.currentIndex === 1
+                validator: RegularExpressionValidator {
+                    // IPv4用の簡易的な正規表現例 (完全には厳密ではありません)
+                    // 0~255の範囲もすべてはカバーできないシンプル例
+                    regularExpression: /^(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)$/
+                }
             }
 
-            // ポート入力フィールド
+            // ポート入力フィールド (IntValidatorで範囲チェック)
             TextField {
                 id: portField
-                placeholderText: qsTr("Enter port (e.g. 12345)")
-            }
-
-            // 現在の接続先を表示するためのラベル例
-            Text {
-                id: currentConnectionLabel
-                text: mainWindow.isRemote ? qsTr("Remote") : qsTr("Local")
-                // 例: Mode_Remote の場合には "Current: 192.168.0.220:12345" といった表示に変える
+                width: engineModeRow.width
+                placeholderText: qsTr("Enter port (1-65535)")
+                enabled: modeCombo.currentIndex === 1
+                validator: IntValidator {
+                    bottom: 1
+                    top: 65535
+                }
             }
 
             Button {
                 text: qsTr("Apply")
                 onClicked: {
+                    if (modeCombo.currentIndex === 0) {
+                        // Local
+                        LlamaChatEngine.switchEngineMode(LlamaChatEngine.Mode_Local)
+                        settingsDrawer.close()
+                        return
+                    }
+
                     LlamaChatEngine.ip_address = ipField.text
                     LlamaChatEngine.port_number = portField.text
-                    if (modeCombo.currentIndex === 0) { LlamaChatEngine.switchEngineMode(LlamaChatEngine.Mode_Local) }
-                    else { LlamaChatEngine.switchEngineMode(LlamaChatEngine.Mode_Remote) }
+                    LlamaChatEngine.switchEngineMode(LlamaChatEngine.Mode_Remote)
                     settingsDrawer.close()
                 }
             }

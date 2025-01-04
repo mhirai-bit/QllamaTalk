@@ -6,7 +6,7 @@
 #include <QDebug>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
-
+#include <QQuickStyle>
 #include "app_environment.h"
 
 int main(int argc, char ** argv) {
@@ -14,6 +14,28 @@ int main(int argc, char ** argv) {
     set_qt_environment();
 
     QGuiApplication app(argc, argv);
+
+#ifdef Q_OS_IOS
+    // iOS
+    QQuickStyle::setStyle("iOS");
+#elif defined(Q_OS_MACOS)
+    // macOS
+    QQuickStyle::setStyle("macOS");
+#elif defined(Q_OS_WIN)
+    // Windows
+    QQuickStyle::setStyle("FluentWinUI3");
+#elif defined(Q_OS_ANDROID)
+    // Android
+    QQuickStyle::setStyle("Material");
+#elif defined(Q_OS_LINUX)
+    // Linux
+    QQuickStyle::setStyle("Fusion");
+#else
+    // その他
+    QQuickStyle::setStyle("Fusion");
+#endif
+
+    qDebug() << "style:" << QQuickStyle::name();
 
     QQmlApplicationEngine engine;
     const QUrl url(u"qrc:/qt/qml/Main/main.qml"_qs);

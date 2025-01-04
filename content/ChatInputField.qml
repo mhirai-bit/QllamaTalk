@@ -12,6 +12,11 @@ TextField {
     placeholderTextColor: "#9d9faa"
     font.pointSize: 14
     padding: 10
+
+    // 入力中の仮名変換などでハイライト表示される色を明示的に指定する
+    selectionColor: "#6C71C4"       // ハイライト部分の色 (例: 紫っぽい色)
+    selectedTextColor: "#ffffff"    // ハイライト部分にある文字色 (例: 白)
+
     background: Rectangle {
         radius: 5
         border {
