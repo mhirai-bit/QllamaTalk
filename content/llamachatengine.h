@@ -105,6 +105,8 @@ signals:
     void local_initializedChanged();
     void remote_initializedChanged();
 
+    void inferenceErrorToQML(const QString& error_message);
+
 private slots:
     // Receives partial AI response
     // 部分的なAI応答を受け取る

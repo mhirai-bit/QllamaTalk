@@ -237,6 +237,8 @@ void LlamaChatEngine::configureRemoteSignalSlots()
                this, &LlamaChatEngine::onPartialResponse);
     disconnect(m_local_generator, &LlamaResponseGenerator::generationFinished,
                this, &LlamaChatEngine::onGenerationFinished);
+    disconnect(m_local_generator, &LlamaResponseGenerator::generationError,
+               this, &LlamaChatEngine::inferenceErrorToQML);
 
     // Connect remote signals
     connect(this, &LlamaChatEngine::requestGeneration,
@@ -245,6 +247,8 @@ void LlamaChatEngine::configureRemoteSignalSlots()
             this, &LlamaChatEngine::onPartialResponse);
     connect(m_remote_generator, &LlamaResponseGeneratorReplica::generationFinished,
             this, &LlamaChatEngine::onGenerationFinished);
+    connect(m_remote_generator, &LlamaResponseGeneratorReplica::generationError,
+            this, &LlamaChatEngine::inferenceErrorToQML);
 
     qDebug() << "[EngineSwitch] Now using REMOTE engine.";
 }
@@ -261,6 +265,8 @@ void LlamaChatEngine::configureLocalSignalSlots()
                    this, &LlamaChatEngine::onPartialResponse);
         disconnect(m_remote_generator, &LlamaResponseGeneratorReplica::generationFinished,
                    this, &LlamaChatEngine::onGenerationFinished);
+        disconnect(m_remote_generator, &LlamaResponseGeneratorReplica::generationError,
+                   this, &LlamaChatEngine::inferenceErrorToQML);
     }
 
     // Connect local signals
@@ -275,6 +281,8 @@ void LlamaChatEngine::configureLocalSignalSlots()
             this, &LlamaChatEngine::onPartialResponse);
     connect(m_local_generator, &LlamaResponseGenerator::generationFinished,
             this, &LlamaChatEngine::onGenerationFinished);
+    connect(m_local_generator, &LlamaResponseGenerator::generationError,
+            this, &LlamaChatEngine::inferenceErrorToQML);
 
     qDebug() << "[EngineSwitch] Now using LOCAL engine.";
 }

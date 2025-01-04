@@ -4,6 +4,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.VectorImage
 import QtQuick.Controls
+import QtQuick.Dialogs
 
 import QllamaTalk
 import content
@@ -16,6 +17,58 @@ ApplicationWindow {
     height: Screen.height
 
     property bool isRemote: LlamaChatEngine.currentEngineMode === LlamaChatEngine.Mode_Remote
+
+    Connections {
+        target: LlamaChatEngine
+        onInferenceErrorToQML: function(errorMessage) {
+            if (mainWindow.isRemote) {
+                remoteAIErrorDialog.errorMessage = errorMessage
+                remoteAIErrorDialog.open()
+            } else {
+                localAIErrorDialog.errorMessage = errorMessage
+                localAIErrorDialog.open()
+            }
+        }
+    }
+
+    MessageDialog {
+        id: remoteAIErrorDialog
+        property string errorMessage: ""
+        text: qsTr("An Error Occurred in Remote AI")
+        informativeText: qsTr("Do you want to fall back to the Local AI?")
+        detailedText: qsTr("Error: %1").arg(errorMessage)
+        buttons: MessageDialog.Yes | MessageDialog.No
+
+        onButtonClicked: function(button, role){
+            switch(button) {
+                case MessageDialog.Yes:
+                    LlamaChatEngine.switchEngineMode(LlamaChatEngine.Mode_Local)
+                    break
+                case MessageDialog.No:
+                    break
+            }
+        }
+    }
+
+    MessageDialog {
+        id: localAIErrorDialog
+        property string errorMessage: ""
+        text: qsTr("An Error Occurred in Local AI")
+        informativeText: qsTr("Do you want to connect to the Remote AI?")
+        detailedText: qsTr("Error: %1").arg(errorMessage)
+        buttons: MessageDialog.Yes | MessageDialog.No
+
+        onButtonClicked: function(button, role){
+            switch(button) {
+                case MessageDialog.Yes:
+                    modeCombo.currentIndex = 1
+                    settingsDrawer.open()
+                    break
+                case MessageDialog.No:
+                    break
+            }
+        }
+    }
 
     // ヘッダー部分
     header: Item {
