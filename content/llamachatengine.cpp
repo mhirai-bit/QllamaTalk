@@ -97,6 +97,57 @@ void LlamaChatEngine::onGenerationFinished(const QString &finalResponse)
     }
 }
 
+void LlamaChatEngine::configureRemoteObjects()
+{
+    qDebug() << "Connecting to remote node...";
+    qDebug() << "ip_address:" << m_ip_address;
+    qDebug() << "port_number:" << m_port_number;
+    m_remoteMode = new QRemoteObjectNode(this);
+    bool result = m_remoteMode->connectToNode(QUrl(QStringLiteral("tcp://%1:%2").arg(m_ip_address).arg(m_port_number)));
+
+    if(m_ip_address.isEmpty() || m_port_number == 0) {
+        // QRemoteObjectNode::connectToNode() seens to be returning true even when it fails to resolve the IP address
+        qDebug() << "IP address and/or port number not set.";
+        return;
+    }
+
+    if(result) {
+        qDebug() << "Connected to remote node.";
+        m_remoteGenerator = m_remoteMode->acquire<LlamaResponseGeneratorReplica>();
+        if (!m_remoteGenerator) {
+            // handle error
+            qDebug() << "Failed to acquire remote generator.";
+        }
+        m_remoteGenerator->setParent(this);
+    } else {
+        qDebug() << "Failed to connect to remote node.";
+    }
+}
+
+void LlamaChatEngine::updateRemoteInitializationStatus()
+{
+    if(!m_remoteGenerator) {
+        qDebug() << "No remote generator available.";
+        return;
+    }
+
+    qDebug() << "m_remoteGenerator->remoteInitialized():" << m_remoteGenerator->remoteInitialized();
+    if (m_remoteGenerator->remoteInitialized()) {
+        qDebug() << "Remote engine initialized.";
+        setRemote_initialzied(true);
+    } else {
+        qDebug() << "Remote engine not initialized.";
+        setRemote_initialzied(false);
+
+        // When remote engine signals initialization, check if local is also ready
+        // リモートエンジン初期化を受け取り、ローカルもOKならエンジン全体を初期化済みに
+        connect(m_remoteGenerator, &LlamaResponseGeneratorReplica::remoteInitializedChanged,
+                this, [this]() {
+                    setRemote_initialzied(m_remoteGenerator->remoteInitialized());
+                });
+    }
+}
+
 // Called on UI thread after doEngineInit() completes
 // doEngineInit()完了後、UIスレッドで呼ばれる
 void LlamaChatEngine::onEngineInitFinished()
@@ -109,106 +160,145 @@ void LlamaChatEngine::onEngineInitFinished()
             m_localGenerator, &QObject::deleteLater);
     m_localWorkerThread->start();
 
-// #ifdef Q_OS_IOS
-    // Prepare remote engine
-    QRemoteObjectNode* node = new QRemoteObjectNode(this);
-    node->connectToNode(QUrl("tcp://192.168.0.220:12345")); // example endpoint
-    // node->connectToNode(QUrl("tcp://127.0.0.1:12345")); // example endpoint
-    m_remoteGenerator = node->acquire<LlamaResponseGeneratorReplica>();
-    if (!m_remoteGenerator) {
-        // handle error
-        qDebug() << "Failed to acquire remote generator.";
-    }
-    m_remoteGenerator->setParent(this);
-// #endif
-
     connect(this, &LlamaChatEngine::user_inputChanged,
             this, &LlamaChatEngine::handle_new_user_input);
 
+    setLocal_initialized(true);
+
+    configureRemoteObjects();
     // Default: local engine
-    // doImmediateEngineSwitch(Mode_Local);
-    doImmediateEngineSwitch(Mode_Remote);
-
-    m_local_initialized = true;
-// #ifdef Q_OS_IOS
-    qDebug() << "m_remoteGenerator->remoteInitialized():" << m_remoteGenerator->remoteInitialized();
-    if (m_remoteGenerator->remoteInitialized()) {
-        qDebug() << "Remote engine initialized.";
-        setEngine_initialized(true);
-    } else {
-        qDebug() << "Remote engine not initialized.";
-        setEngine_initialized(false);
-
-        // When remote engine signals initialization, check if local is also ready
-        // リモートエンジン初期化を受け取り、ローカルもOKならエンジン全体を初期化済みに
-        connect(m_remoteGenerator, &LlamaResponseGeneratorReplica::remoteInitializedChanged,
-                this, [this]() {
-                    bool remoteOk = m_remoteGenerator->remoteInitialized();
-                    if (m_local_initialized && remoteOk) {
-                        setEngine_initialized(true);
-                    }
-                });
-    }
-// #else
-    // setEngine_initialized(true);
-// #endif
+    doImmediateEngineSwitch(Mode_Local);
 }
 
 // Immediately switch local/remote engine connections
 // ローカル/リモートエンジンの接続を即時切り替え
 void LlamaChatEngine::doImmediateEngineSwitch(EngineMode newMode)
 {
-    if (newMode == m_currentEngineMode) {
-        qDebug() << "Already in this mode:" << newMode;
-        return;
-    }
-
     // Disconnect old connections
     disconnect(this, &LlamaChatEngine::requestGeneration, nullptr, nullptr);
 
     if (newMode == Mode_Local) {
-        if(m_remoteGenerator) {
-            // Disconnect remote signals
-            disconnect(m_remoteGenerator, &LlamaResponseGeneratorReplica::partialResponseReady,
-                       this, &LlamaChatEngine::onPartialResponse);
-            disconnect(m_remoteGenerator, &LlamaResponseGeneratorReplica::generationFinished,
-                       this, &LlamaChatEngine::onGenerationFinished);
-        }
-
-        // Connect local
-        connect(this, &LlamaChatEngine::requestGeneration,
-                m_localGenerator, [this](const QList<LlamaChatMessage>& messages) {
-                    QMetaObject::invokeMethod(m_localGenerator,
-                                              "generate",
-                                              Qt::QueuedConnection,
-                                              Q_ARG(const QList<LlamaChatMessage>&, messages));
-                });
-        connect(m_localGenerator, &LlamaResponseGenerator::partialResponseReady,
-                this, &LlamaChatEngine::onPartialResponse);
-        connect(m_localGenerator, &LlamaResponseGenerator::generationFinished,
-                this, &LlamaChatEngine::onGenerationFinished);
-
-        qDebug() << "[EngineSwitch] Now using LOCAL engine.";
+        configureLocalSignalSlots();
     } else {
-        // Disconnect local signals
-        disconnect(m_localGenerator, &LlamaResponseGenerator::partialResponseReady,
-                   this, &LlamaChatEngine::onPartialResponse);
-        disconnect(m_localGenerator, &LlamaResponseGenerator::generationFinished,
-                   this, &LlamaChatEngine::onGenerationFinished);
-
-        // Connect remote
-        connect(this, &LlamaChatEngine::requestGeneration,
-                m_remoteGenerator, &LlamaResponseGeneratorReplica::generate);
-        connect(m_remoteGenerator, &LlamaResponseGeneratorReplica::partialResponseReady,
-                this, &LlamaChatEngine::onPartialResponse);
-        connect(m_remoteGenerator, &LlamaResponseGeneratorReplica::generationFinished,
-                this, &LlamaChatEngine::onGenerationFinished);
-
-        qDebug() << "[EngineSwitch] Now using REMOTE engine.";
+        if (!m_remoteGenerator) {
+            configureRemoteObjects();
+        }
+        configureRemoteSignalSlots();
+        updateRemoteInitializationStatus();
     }
 
-    m_currentEngineMode = newMode;
+    setCurrentEngineMode(newMode);
     qDebug() << "[EngineSwitch] doImmediateEngineSwitch -> newMode =" << newMode;
+}
+
+void LlamaChatEngine::configureRemoteSignalSlots()
+{
+    // Disconnect local signals
+    disconnect(m_localGenerator, &LlamaResponseGenerator::partialResponseReady,
+               this, &LlamaChatEngine::onPartialResponse);
+    disconnect(m_localGenerator, &LlamaResponseGenerator::generationFinished,
+               this, &LlamaChatEngine::onGenerationFinished);
+
+    // Connect remote
+    connect(this, &LlamaChatEngine::requestGeneration,
+            m_remoteGenerator, &LlamaResponseGeneratorReplica::generate);
+    connect(m_remoteGenerator, &LlamaResponseGeneratorReplica::partialResponseReady,
+            this, &LlamaChatEngine::onPartialResponse);
+    connect(m_remoteGenerator, &LlamaResponseGeneratorReplica::generationFinished,
+            this, &LlamaChatEngine::onGenerationFinished);
+
+    qDebug() << "[EngineSwitch] Now using REMOTE engine.";
+}
+
+void LlamaChatEngine::configureLocalSignalSlots()
+{
+    if(m_remoteGenerator) {
+        // Disconnect remote signals
+        disconnect(m_remoteGenerator, &LlamaResponseGeneratorReplica::partialResponseReady,
+                   this, &LlamaChatEngine::onPartialResponse);
+        disconnect(m_remoteGenerator, &LlamaResponseGeneratorReplica::generationFinished,
+                   this, &LlamaChatEngine::onGenerationFinished);
+    }
+
+    // Connect local
+    connect(this, &LlamaChatEngine::requestGeneration,
+            m_localGenerator, [this](const QList<LlamaChatMessage>& messages) {
+                QMetaObject::invokeMethod(m_localGenerator,
+                                          "generate",
+                                          Qt::QueuedConnection,
+                                          Q_ARG(const QList<LlamaChatMessage>&, messages));
+            });
+    connect(m_localGenerator, &LlamaResponseGenerator::partialResponseReady,
+            this, &LlamaChatEngine::onPartialResponse);
+    connect(m_localGenerator, &LlamaResponseGenerator::generationFinished,
+            this, &LlamaChatEngine::onGenerationFinished);
+
+    qDebug() << "[EngineSwitch] Now using LOCAL engine.";
+}
+
+bool LlamaChatEngine::remote_initialzied() const
+{
+    return m_remote_initialzied;
+}
+
+void LlamaChatEngine::setRemote_initialzied(bool newRemote_initialzied)
+{
+    if (m_remote_initialzied == newRemote_initialzied)
+        return;
+    m_remote_initialzied = newRemote_initialzied;
+    emit remote_initialziedChanged();
+}
+
+bool LlamaChatEngine::local_initialized() const
+{
+    return m_local_initialized;
+}
+
+void LlamaChatEngine::setLocal_initialized(bool newLocal_initialized)
+{
+    if (m_local_initialized == newLocal_initialized)
+        return;
+    m_local_initialized = newLocal_initialized;
+    emit local_initializedChanged();
+}
+
+int LlamaChatEngine::port_number() const
+{
+    return m_port_number;
+}
+
+void LlamaChatEngine::setPort_number(int newPort_number)
+{
+    if (m_port_number == newPort_number)
+        return;
+    m_port_number = newPort_number;
+    emit port_numberChanged();
+}
+
+QString LlamaChatEngine::ip_address() const
+{
+    return m_ip_address;
+}
+
+void LlamaChatEngine::setIp_address(const QString &newIp_address)
+{
+    if (m_ip_address == newIp_address)
+        return;
+    m_ip_address = newIp_address;
+    emit ip_addressChanged();
+}
+
+LlamaChatEngine::EngineMode LlamaChatEngine::currentEngineMode() const
+{
+    return m_currentEngineMode;
+}
+
+void LlamaChatEngine::setCurrentEngineMode(EngineMode newCurrentEngineMode)
+{
+    if (m_currentEngineMode == newCurrentEngineMode)
+        return;
+    m_currentEngineMode = newCurrentEngineMode;
+    emit currentEngineModeChanged();
 }
 
 // Runs in another thread to load ggml backends, llama model/context
@@ -239,24 +329,6 @@ void LlamaChatEngine::doEngineInit()
     QMetaObject::invokeMethod(this, [this] {
         onEngineInitFinished();
     }, Qt::QueuedConnection);
-}
-
-// Returns if engine is fully initialized
-// エンジンが完全初期化済みかを返す
-bool LlamaChatEngine::engine_initialized() const
-{
-    return m_engine_initialized;
-}
-
-// Private setter for engine_initialized
-// engine_initializedをプライベートに設定
-void LlamaChatEngine::setEngine_initialized(bool newEngine_initialized)
-{
-    if (m_engine_initialized == newEngine_initialized) {
-        return;
-    }
-    m_engine_initialized = newEngine_initialized;
-    emit engine_initializedChanged();
 }
 
 // Getter for user_input

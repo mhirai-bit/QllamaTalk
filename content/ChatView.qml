@@ -11,6 +11,8 @@ Rectangle {
     anchors.fill: parent
     color: "#09102b"
 
+    property bool isRemote: LlamaChatEngine.currentEngineMode === LlamaChatEngine.Mode_Remote
+
     // Optional: set focus to input on visible
     onVisibleChanged: {
         if (root.visible) {
@@ -22,15 +24,15 @@ Rectangle {
         id: loadingSpinner
         anchors.centerIn: parent
         // engine_initialized == false の間だけ表示 & 回転させる
-        visible: !LlamaChatEngine.engine_initialized
-        running: !LlamaChatEngine.engine_initialized
+        visible: root.isRemote ? !LlamaChatEngine.remote_initialzied : !LlamaChatEngine.local_initialized
+        running: root.isRemote ? !LlamaChatEngine.remote_initialzied : !LlamaChatEngine.local_initialized
     }
 
     Text {
         id: loadingText
         anchors.centerIn: parent
         text: qsTr("Loading AI...")
-        visible: !LlamaChatEngine.engine_initialized
+        visible: root.isRemote ? !LlamaChatEngine.remote_initialzied : !LlamaChatEngine.local_initialized
         color: "#f3f3f4"
     }
 
@@ -124,7 +126,7 @@ Rectangle {
     ChatInputField {
         id: _inputField
         focus: true
-        enabled: LlamaChatEngine.engine_initialized
+        enabled: root.isRemote ? LlamaChatEngine.remote_initialzied : LlamaChatEngine.local_initialized
         anchors {
             left: parent.left
             right: parent.right

@@ -4,6 +4,7 @@
 #include <optional>
 #include <QObject>
 #include <QQmlEngine>
+#include <QRemoteObjectNode>
 #include "chatmessagemodel.h"
 #include "llamaresponsegenerator.h"
 #include "rep_LlamaResponseGenerator_replica.h"
@@ -26,7 +27,11 @@ class LlamaChatEngine : public QObject {
     // QMLプロパティ: messages, user_input, engine_initialized
     Q_PROPERTY(ChatMessageModel* messages READ messages CONSTANT)
     Q_PROPERTY(QString user_input READ user_input WRITE setUser_input RESET resetUser_input NOTIFY user_inputChanged FINAL)
-    Q_PROPERTY(bool engine_initialized READ engine_initialized NOTIFY engine_initializedChanged FINAL)
+    Q_PROPERTY(EngineMode currentEngineMode READ currentEngineMode WRITE setCurrentEngineMode NOTIFY currentEngineModeChanged FINAL)
+    Q_PROPERTY(QString ip_address READ ip_address WRITE setIp_address NOTIFY ip_addressChanged FINAL)
+    Q_PROPERTY(int port_number READ port_number WRITE setPort_number NOTIFY port_numberChanged FINAL)
+    Q_PROPERTY(bool local_initialized READ local_initialized WRITE setLocal_initialized NOTIFY local_initializedChanged FINAL)
+    Q_PROPERTY(bool remote_initialzied READ remote_initialzied WRITE setRemote_initialzied NOTIFY remote_initialziedChanged FINAL)
 
 public:
     // Distinguish local vs remote inference
@@ -51,7 +56,21 @@ public:
     QString user_input() const;
     Q_INVOKABLE void setUser_input(const QString &newUser_input);
     void resetUser_input();
-    bool engine_initialized() const;
+
+    EngineMode currentEngineMode() const;
+    void setCurrentEngineMode(EngineMode newCurrentEngineMode);
+
+    QString ip_address() const;
+    void setIp_address(const QString &newIp_address);
+
+    int port_number() const;
+    void setPort_number(int newPort_number);
+
+    bool local_initialized() const;
+    void setLocal_initialized(bool newLocal_initialized);
+
+    bool remote_initialzied() const;
+    void setRemote_initialzied(bool newRemote_initialzied);
 
 public slots:
     // Handle new user input
@@ -65,9 +84,16 @@ signals:
     // Emitted with newly formed prompt to trigger inference
     // 生成したプロンプトを通知して推論を呼び出す
     void requestGeneration(const QList<LlamaChatMessage>& messages);
-    // Emitted when engine init status changes
-    // エンジン初期化状態が変化した時に送出
-    void engine_initializedChanged();
+
+    void currentEngineModeChanged();
+
+    void ip_addressChanged();
+
+    void port_numberChanged();
+
+    void local_initializedChanged();
+
+    void remote_initialziedChanged();
 
 private slots:
     // Receive partial AI response
@@ -86,10 +112,6 @@ private:
     // Heavy initialization in separate thread
     // 別スレッドで重い初期化を行う
     void doEngineInit();
-
-    // Update engine_initialized flag
-    // engine_initializedフラグを更新
-    void setEngine_initialized(bool newEngine_initialized);
 
     // Immediately switch local/remote engines
     // ローカル/リモートエンジンを即座に切り替える
@@ -111,6 +133,13 @@ private:
     // ローカルエンジンとリモートエンジン
     LlamaResponseGenerator* m_localGenerator {nullptr};
     LlamaResponseGeneratorReplica* m_remoteGenerator {nullptr};
+
+    // IP and port for remote inference
+    // リモート推論用のIPとポート
+    QString m_ip_address;
+    int m_port_number;
+
+    QRemoteObjectNode *m_remoteMode {nullptr};
 
     // If a switch request occurs mid-inference, store it here
     // 推論中にモード切り替え要求が来た場合、ここに保管
@@ -134,7 +163,11 @@ private:
     // Engine init status
     // エンジンの初期化状態
     bool m_local_initialized {false};
-    bool m_engine_initialized {false};
+    bool m_remote_initialzied {false};
+    void configureRemoteSignalSlots();
+    void configureLocalSignalSlots();
+    void configureRemoteObjects();
+    void updateRemoteInitializationStatus();
 };
 
 #endif // LLAMACHATENGINE_H
