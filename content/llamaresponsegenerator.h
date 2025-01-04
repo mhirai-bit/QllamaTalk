@@ -6,47 +6,64 @@
 #include "llama.h"
 #include "rep_LlamaResponseGenerator_replica.h"
 
-// This class handles text generation for LLaMA-based models.
-// It is typically used in a worker thread to generate responses asynchronously.
+/*
+  LlamaResponseGenerator:
+    - Generates text using a LLaMA model and context, typically in a worker thread
+    - Emits partial/final results for incremental updates
+
+  LLaMAモデルとコンテキストを用いてテキスト生成を行うクラス。
+  ワーカースレッドで動作し、途中経過と最終結果をシグナルで通知する。
+*/
 class LlamaResponseGenerator : public QObject {
     Q_OBJECT
 
 public:
-    // Disallow default construction to ensure model/context are always provided.
+    // Constructor is disabled if model/context not provided
+    // モデル/コンテキストが提供されない場合はコンストラクタを無効化
     LlamaResponseGenerator() = delete;
 
-    // Constructor expects a LLaMA model, a context, and an optional parent.
-    // 'parent' may be nullptr when the object is moved to another thread.
-    LlamaResponseGenerator(QObject *parent = nullptr,
-                           llama_model* model = nullptr,
-                           llama_context* ctx = nullptr);
+    // Constructor: takes optional parent plus llama_model/llama_context
+    // コンストラクタ: 親と llama_model/llama_context を受け取る
+    explicit LlamaResponseGenerator(QObject *parent = nullptr,
+                                    llama_model* model = nullptr,
+                                    llama_context* ctx = nullptr);
 
-    // Cleans up any allocated resources (e.g. the sampler) on destruction.
+    // Destructor: frees sampler if created
+    // デストラクタ: 作成されたサンプラーがあれば解放
     ~LlamaResponseGenerator() override;
 
 public slots:
-    // Generates text from the provided prompt, emitting partial and final results.
+    // Generates text from the given messages, emits partial/final
+    // 指定メッセージからテキスト生成し、途中/最終結果をemit
     void generate(const QList<LlamaChatMessage>& messages);
 
 signals:
-    // Emitted periodically with incremental output during generation.
+    // Emitted during generation for incremental text
+    // 生成中に逐次テキストを通知
     void partialResponseReady(const QString &textSoFar);
 
-    // Emitted once the entire generation process is complete.
+    // Emitted when generation is done
+    // 生成完了時に通知
     void generationFinished(const QString &finalResponse);
 
-    // Emitted in case of an error (e.g., tokenization failure).
+    // Emitted on error (e.g., tokenization failure)
+    // エラー発生時に通知 (例: トークナイズ失敗)
     void generationError(const QString &errorMessage);
 
 private:
-    // References to the LLaMA model and context used for generation.
-    llama_model* m_model {nullptr};
-    llama_context* m_ctx {nullptr};
+    // Holds LLaMA model/context/sampler references
+    // LLaMAのモデル/コンテキスト/サンプル参照
+    llama_model*   m_model   {nullptr};
+    llama_context* m_ctx     {nullptr};
     llama_sampler* m_sampler {nullptr};
 
-    // Initializes the sampler (temperature, min_p, etc.) before text generation.
-    void initializeSampler();
-    std::vector<llama_chat_message> toLlamaMessages(const QList<LlamaChatMessage> &userMessages);
+    // Initializes the sampler with default settings
+    // サンプラーをデフォルト設定で初期化
+    void initialize_sampler();
+
+    // Converts from QList<LlamaChatMessage> to std::vector<llama_chat_message>
+    // QList<LlamaChatMessage> → std::vector<llama_chat_message> に変換
+    std::vector<llama_chat_message> to_llama_messages(const QList<LlamaChatMessage> &user_messages);
 };
 
 #endif // LLAMA_RESPONSE_GENERATOR_H

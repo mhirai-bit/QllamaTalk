@@ -24,15 +24,15 @@ Rectangle {
         id: loadingSpinner
         anchors.centerIn: parent
         // engine_initialized == false の間だけ表示 & 回転させる
-        visible: root.isRemote ? !LlamaChatEngine.remote_initialzied : !LlamaChatEngine.local_initialized
-        running: root.isRemote ? !LlamaChatEngine.remote_initialzied : !LlamaChatEngine.local_initialized
+        visible: root.isRemote ? !LlamaChatEngine.remote_initialized : !LlamaChatEngine.local_initialized
+        running: root.isRemote ? !LlamaChatEngine.remote_initialized : !LlamaChatEngine.local_initialized
     }
 
     Text {
         id: loadingText
         anchors.centerIn: parent
         text: qsTr("Loading AI...")
-        visible: root.isRemote ? !LlamaChatEngine.remote_initialzied : !LlamaChatEngine.local_initialized
+        visible: root.isRemote ? !LlamaChatEngine.remote_initialized : !LlamaChatEngine.local_initialized
         color: "#f3f3f4"
     }
 
@@ -126,7 +126,7 @@ Rectangle {
     ChatInputField {
         id: _inputField
         focus: true
-        enabled: root.isRemote ? LlamaChatEngine.remote_initialzied : LlamaChatEngine.local_initialized
+        enabled: root.isRemote ? LlamaChatEngine.remote_initialized : LlamaChatEngine.local_initialized
         anchors {
             left: parent.left
             right: parent.right
