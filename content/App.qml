@@ -84,14 +84,29 @@ ApplicationWindow {
                 id: onlineOfflineIcon
                 // isRemote に基づいてアイコンを切り替え
                 source: mainWindow.isRemote ? "icons/online.svg" : "icons/offline.svg"
+                anchors.verticalCenter: headerRow.verticalCenter
             }
 
-            Text {
-                // isRemote なら ip_address:port_number を表示
+            Label {
+                // isRemote なら ipAddress:portNumber を表示
                 text: mainWindow.isRemote
-                    ? qsTr("Remote") + " " + LlamaChatEngine.ip_address + ":" + LlamaChatEngine.port_number
+                    ? qsTr("Remote") + " " + LlamaChatEngine.ipAddress + ":" + LlamaChatEngine.portNumber
                     : qsTr("Local")
-                anchors.verticalCenter: onlineOfflineIcon.verticalCenter
+                anchors.verticalCenter: headerRow.verticalCenter
+            }
+
+            VectorImage {
+                id: remoteInferenceErrorIcon
+                visible: LlamaChatEngine.remoteAiInError
+                source: "icons/remote_error.svg"
+                anchors.verticalCenter: headerRow.verticalCenter
+            }
+
+            VectorImage {
+                id: localInferenceErrorIcon
+                visible: LlamaChatEngine.localAiInError
+                source: "icons/local_error.svg"
+                anchors.verticalCenter: headerRow.verticalCenter
             }
         }
 
@@ -121,7 +136,7 @@ ApplicationWindow {
             spacing: 16
             padding: 20
 
-            Text {
+            Label {
                 id: connectionSettingText
                 text: qsTr("Connection Settings")
                 font.bold: true
@@ -131,7 +146,7 @@ ApplicationWindow {
             Row {
                 id: engineModeRow
                 spacing: 8
-                Text {
+                Label {
                     id: modeLabel
                     text: qsTr("Engine Mode:")
                     anchors.verticalCenter: modeCombo.verticalCenter
@@ -179,8 +194,8 @@ ApplicationWindow {
                         return
                     }
 
-                    LlamaChatEngine.ip_address = ipField.text
-                    LlamaChatEngine.port_number = portField.text
+                    LlamaChatEngine.ipAddress = ipField.text
+                    LlamaChatEngine.portNumber = portField.text
                     LlamaChatEngine.switchEngineMode(LlamaChatEngine.Mode_Remote)
                     settingsDrawer.close()
                 }

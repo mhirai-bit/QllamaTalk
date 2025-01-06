@@ -50,12 +50,14 @@ signals:
     // エラー発生時に通知 (例: トークナイズ失敗)
     void generationError(const QString &errorMessage);
 
+    void initialized();
+
 private:
     // Holds LLaMA model/context/sampler references
     // LLaMAのモデル/コンテキスト/サンプル参照
-    llama_model*   m_model   {nullptr};
-    llama_context* m_ctx     {nullptr};
-    llama_sampler* m_sampler {nullptr};
+    llama_model*   mModel   {nullptr};
+    llama_context* mCtx     {nullptr};
+    llama_sampler* mSampler {nullptr};
 
     // Initializes the sampler with default settings
     // サンプラーをデフォルト設定で初期化

@@ -20,22 +20,6 @@ Rectangle {
         }
     }
 
-    BusyIndicator {
-        id: loadingSpinner
-        anchors.centerIn: parent
-        // engine_initialized == false の間だけ表示 & 回転させる
-        visible: root.isRemote ? !LlamaChatEngine.remote_initialized : !LlamaChatEngine.local_initialized
-        running: root.isRemote ? !LlamaChatEngine.remote_initialized : !LlamaChatEngine.local_initialized
-    }
-
-    Text {
-        id: loadingText
-        anchors.centerIn: parent
-        text: qsTr("Loading AI...")
-        visible: root.isRemote ? !LlamaChatEngine.remote_initialized : !LlamaChatEngine.local_initialized
-        color: "#f3f3f4"
-    }
-
     ListView {
         id: messageListView
         anchors.top: parent.top
@@ -126,7 +110,7 @@ Rectangle {
     ChatInputField {
         id: _inputField
         focus: true
-        enabled: root.isRemote ? LlamaChatEngine.remote_initialized : LlamaChatEngine.local_initialized
+        enabled: root.isRemote ? LlamaChatEngine.remoteInitialized : LlamaChatEngine.localInitialized
         anchors {
             left: parent.left
             right: parent.right
@@ -136,8 +120,24 @@ Rectangle {
 
         placeholderText: qsTr("Start typing here...")
         onAccepted: {
-            LlamaChatEngine.setUser_input(_inputField.text)
+            LlamaChatEngine.setUserInput(_inputField.text)
             _inputField.text = ""
         }
+    }
+
+    BusyIndicator {
+        id: loadingSpinner
+        anchors.centerIn: parent
+        // engine_initialized == false の間だけ表示 & 回転させる
+        visible: root.isRemote ? !LlamaChatEngine.remoteInitialized : !LlamaChatEngine.localInitialized
+        running: root.isRemote ? !LlamaChatEngine.remoteInitialized : !LlamaChatEngine.localInitialized
+    }
+
+    Text {
+        id: loadingText
+        anchors.centerIn: parent
+        text: qsTr("Loading AI...")
+        visible: root.isRemote ? !LlamaChatEngine.remoteInitialized : !LlamaChatEngine.localInitialized
+        color: "#f3f3f4"
     }
 }

@@ -14,8 +14,8 @@ LlamaResponseGenerator::LlamaResponseGenerator(QObject *parent,
                                                llama_model *model,
                                                llama_context *ctx)
     : QObject(parent)
-    , m_model(model)
-    , m_ctx(ctx)
+    , mModel(model)
+    , mCtx(ctx)
 {
 }
 
@@ -28,8 +28,8 @@ LlamaResponseGenerator::LlamaResponseGenerator(QObject *parent,
 */
 LlamaResponseGenerator::~LlamaResponseGenerator()
 {
-    if (m_sampler) {
-        llama_sampler_free(m_sampler);
+    if (mSampler) {
+        llama_sampler_free(mSampler);
     }
 }
 
@@ -47,7 +47,7 @@ void LlamaResponseGenerator::generate(const QList<LlamaChatMessage>& messages)
 {
     // Initialize sampler on first call
     // 初回呼び出し時にサンプラー初期化
-    if (!m_sampler) {
+    if (!mSampler) {
         initialize_sampler();
     }
 
@@ -56,47 +56,48 @@ void LlamaResponseGenerator::generate(const QList<LlamaChatMessage>& messages)
 
     // Use static buffers to hold formatted text / prev length
     // フォーマットされたテキストや前回長さをstatic変数で保持
-    static std::vector<char> formatted_vec(llama_n_ctx(m_ctx));
-    static int prev_len {0};
+    static std::vector<char> formattedVec(llama_n_ctx(mCtx));
+    static int prevLen {0};
 
     // Convert input messages to llama_chat_message vector
     // 入力メッセージを llama_chat_message のベクタに変換
-    std::vector<llama_chat_message> messages_for_llama = to_llama_messages(messages);
+    std::vector<llama_chat_message> messagesForLlama = to_llama_messages(messages);
 
     // Apply chat template
     // チャットテンプレートを適用
-    int new_len = llama_chat_apply_template(
-        m_model, nullptr,
-        messages_for_llama.data(), messages_for_llama.size(),
+    int newLen = llama_chat_apply_template(
+        mModel, nullptr,
+        messagesForLlama.data(), messagesForLlama.size(),
         true,
-        formatted_vec.data(), formatted_vec.size()
+        formattedVec.data(), formattedVec.size()
         );
-    if (new_len > static_cast<int>(formatted_vec.size())) {
-        formatted_vec.resize(new_len);
-        new_len = llama_chat_apply_template(
-            m_model, nullptr,
-            messages_for_llama.data(), messages_for_llama.size(),
+
+    if (newLen > static_cast<int>(formattedVec.size())) {
+        formattedVec.resize(newLen);
+        newLen = llama_chat_apply_template(
+            mModel, nullptr,
+            messagesForLlama.data(), messagesForLlama.size(),
             true,
-            formatted_vec.data(), formatted_vec.size()
+            formattedVec.data(), formattedVec.size()
             );
     }
-    if (new_len < 0) {
+    if (newLen < 0) {
         fprintf(stderr, "Failed to apply chat template.\n");
         return;
     }
 
     // Extract new portion of prompt
     // 新しく追加されたプロンプト部分を取り出す
-    std::string prompt_std(formatted_vec.begin() + prev_len,
-                           formatted_vec.begin() + new_len);
+    std::string promptStd(formattedVec.begin() + prevLen,
+                          formattedVec.begin() + newLen);
     std::string response;
 
     // Tokenize the prompt text
     // プロンプトをトークナイズ
-    const int n_prompt_tokens = -llama_tokenize(
-        m_model,
-        prompt_std.c_str(),
-        prompt_std.size(),
+    const int nPromptTokens = -llama_tokenize(
+        mModel,
+        promptStd.c_str(),
+        promptStd.size(),
         nullptr,
         0,
         true,  // is_prefix
@@ -105,14 +106,14 @@ void LlamaResponseGenerator::generate(const QList<LlamaChatMessage>& messages)
 
     // Prepare tokens
     // トークンのベクタ準備
-    std::vector<llama_token> prompt_tokens(n_prompt_tokens);
+    std::vector<llama_token> promptTokens(nPromptTokens);
     if (llama_tokenize(
-            m_model,
-            prompt_std.c_str(),
-            prompt_std.size(),
-            prompt_tokens.data(),
-            prompt_tokens.size(),
-            llama_get_kv_cache_used_cells(m_ctx) == 0,
+            mModel,
+            promptStd.c_str(),
+            promptStd.size(),
+            promptTokens.data(),
+            promptTokens.size(),
+            llama_get_kv_cache_used_cells(mCtx) == 0,
             true) < 0)
     {
         emit generationError("failed to tokenize the prompt");
@@ -120,29 +121,29 @@ void LlamaResponseGenerator::generate(const QList<LlamaChatMessage>& messages)
 
     // Single batch for decode
     // デコード用バッチを1つ作成
-    llama_batch batch = llama_batch_get_one(prompt_tokens.data(),
-                                            prompt_tokens.size());
-    llama_token new_token_id;
+    llama_batch batch = llama_batch_get_one(promptTokens.data(),
+                                            promptTokens.size());
+    llama_token newTokenId;
 
-    static constexpr int max_reply_tokens    {1024};
-    static constexpr int extra_cutoff_tokens {32};
-    int generated_token_count {0};
+    static constexpr int maxReplyTokens    {1024};
+    static constexpr int extraCutoffTokens {32};
+    int generatedTokenCount {0};
 
     // Decode tokens until end-of-generation
     // 終了トークンに達するまでトークンをデコード
     while (true) {
-        if (llama_decode(m_ctx, batch)) {
+        if (llama_decode(mCtx, batch)) {
             emit generationError("failed to decode");
             break;
         }
-        new_token_id = llama_sampler_sample(m_sampler, m_ctx, -1);
+        newTokenId = llama_sampler_sample(mSampler, mCtx, -1);
 
-        if (llama_token_is_eog(m_model, new_token_id)) {
+        if (llama_token_is_eog(mModel, newTokenId)) {
             break;
         }
 
         char buf[256] = {};
-        const int n = llama_token_to_piece(m_model, new_token_id, buf,
+        const int n = llama_token_to_piece(mModel, newTokenId, buf,
                                            sizeof(buf), 0, true);
         if (n < 0) {
             emit generationError("failed to convert token to piece");
@@ -158,31 +159,31 @@ void LlamaResponseGenerator::generate(const QList<LlamaChatMessage>& messages)
 
         // Add next token to batch
         // 次のトークンをバッチに追加
-        batch = llama_batch_get_one(&new_token_id, 1);
+        batch = llama_batch_get_one(&newTokenId, 1);
 
-        ++generated_token_count;
-        if (generated_token_count > max_reply_tokens) {
+        ++generatedTokenCount;
+        if (generatedTokenCount > maxReplyTokens) {
             if (piece.find('\n') != std::string::npos) {
                 qDebug() << "Cutting off the generation at a newline character";
                 break;
-            } else if (generated_token_count > max_reply_tokens + extra_cutoff_tokens) {
+            } else if (generatedTokenCount > maxReplyTokens + extraCutoffTokens) {
                 qDebug() << "Cutting off the generation +"
-                         << extra_cutoff_tokens
+                         << extraCutoffTokens
                          << " tokens";
                 break;
             }
         }
     }
 
-    // Update prev_len for next
+    // Update prevLen for next
     // 次の生成に備えて prev_len を更新
-    prev_len = llama_chat_apply_template(
-        m_model, nullptr,
-        messages_for_llama.data(), messages_for_llama.size(),
+    prevLen = llama_chat_apply_template(
+        mModel, nullptr,
+        messagesForLlama.data(), messagesForLlama.size(),
         false,
         nullptr, 0
         );
-    if (prev_len < 0) {
+    if (prevLen < 0) {
         fprintf(stderr, "Failed to apply chat template.\n");
     }
 
@@ -199,18 +200,18 @@ void LlamaResponseGenerator::generate(const QList<LlamaChatMessage>& messages)
     - 必要なら自動的に解放される
 */
 std::vector<llama_chat_message>
-LlamaResponseGenerator::to_llama_messages(const QList<LlamaChatMessage> &user_messages)
+LlamaResponseGenerator::to_llama_messages(const QList<LlamaChatMessage> &userMessages)
 {
-    std::vector<llama_chat_message> llama_messages;
-    llama_messages.reserve(user_messages.size());
+    std::vector<llama_chat_message> llamaMessages;
+    llamaMessages.reserve(userMessages.size());
 
-    for (const auto &um : user_messages) {
+    for (const auto &um : userMessages) {
         llama_chat_message lm;
         lm.role    = strdup(um.role().toUtf8().constData());
         lm.content = strdup(um.content().toUtf8().constData());
-        llama_messages.push_back(lm);
+        llamaMessages.push_back(lm);
     }
-    return llama_messages;
+    return llamaMessages;
 }
 
 /*
@@ -224,8 +225,8 @@ LlamaResponseGenerator::to_llama_messages(const QList<LlamaChatMessage> &user_me
 */
 void LlamaResponseGenerator::initialize_sampler()
 {
-    m_sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
-    llama_sampler_chain_add(m_sampler, llama_sampler_init_min_p(0.05f, 1));
-    llama_sampler_chain_add(m_sampler, llama_sampler_init_temp(0.8f));
-    llama_sampler_chain_add(m_sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+    mSampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    llama_sampler_chain_add(mSampler, llama_sampler_init_min_p(0.05f, 1));
+    llama_sampler_chain_add(mSampler, llama_sampler_init_temp(0.8f));
+    llama_sampler_chain_add(mSampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 }

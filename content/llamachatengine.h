@@ -29,12 +29,15 @@ class LlamaChatEngine : public QObject {
     // QML properties (English/Japanese)
     // QMLプロパティ
     Q_PROPERTY(ChatMessageModel* messages READ messages CONSTANT)
-    Q_PROPERTY(QString user_input READ user_input WRITE setUser_input RESET resetUser_input NOTIFY user_inputChanged FINAL)
+    Q_PROPERTY(QString userInput READ userInput WRITE setUserInput RESET resetUserInput NOTIFY userInputChanged FINAL)
     Q_PROPERTY(EngineMode currentEngineMode READ currentEngineMode NOTIFY currentEngineModeChanged FINAL)
-    Q_PROPERTY(QString ip_address READ ip_address WRITE setIp_address NOTIFY ip_addressChanged FINAL)
-    Q_PROPERTY(int port_number READ port_number WRITE setPort_number NOTIFY port_numberChanged FINAL)
-    Q_PROPERTY(bool local_initialized READ local_initialized WRITE setLocal_initialized NOTIFY local_initializedChanged FINAL)
-    Q_PROPERTY(bool remote_initialized READ remote_initialized WRITE setRemote_initialized NOTIFY remote_initializedChanged FINAL)
+    Q_PROPERTY(QString ipAddress READ ipAddress WRITE setIpAddress NOTIFY ipAddressChanged FINAL)
+    Q_PROPERTY(int portNumber READ portNumber WRITE setPortNumber NOTIFY portNumberChanged FINAL)
+    Q_PROPERTY(bool localInitialized READ localInitialized WRITE setLocalInitialized NOTIFY localInitializedChanged FINAL)
+    Q_PROPERTY(bool remoteInitialized READ remoteInitialized WRITE setRemoteInitialized NOTIFY remoteInitializedChanged FINAL)
+    Q_PROPERTY(bool remoteAiInError READ remoteAiInError NOTIFY remoteAiInErrorChanged FINAL)
+    Q_PROPERTY(bool localAiInError READ localAiInError NOTIFY localAiInErrorChanged FINAL)
+    Q_PROPERTY(bool inProgress READ inProgress NOTIFY inProgressChanged FINAL)
 
 public:
     // EngineMode: local / remote / uninitialized
@@ -59,23 +62,32 @@ public:
     // QMLに公開するゲッター/セッター
     ChatMessageModel* messages();
 
-    QString user_input() const;
-    Q_INVOKABLE void setUser_input(const QString &new_user_input);
-    void resetUser_input();
+    QString userInput() const;
+    Q_INVOKABLE void setUserInput(const QString &newUserInput);
+    void resetUserInput();
 
     EngineMode currentEngineMode() const;
 
-    QString ip_address() const;
-    void setIp_address(const QString &new_ip_address);
+    QString ipAddress() const;
+    void setIpAddress(const QString &newIpAddress);
 
-    int port_number() const;
-    void setPort_number(int new_port_number);
+    int portNumber() const;
+    void setPortNumber(int newPortNumber);
 
-    bool local_initialized() const;
-    void setLocal_initialized(bool new_local_initialized);
+    bool localInitialized() const;
+    void setLocalInitialized(bool newLocalInitialized);
 
-    bool remote_initialized() const;
-    void setRemote_initialized(bool new_remote_initialized);
+    bool remoteInitialized() const;
+    void setRemoteInitialized(bool newRemoteInitialized);
+
+    bool remoteAiInError() const;
+    void setRemoteAiInError(bool newRemoteAiInError);
+
+    bool localAiInError() const;
+    void setLocalAiInError(bool newLocalAiInError);
+
+    bool inProgress() const;
+    void setInProgress(bool newInProgress);
 
 public slots:
     // Process user input (apply template, request generation)
@@ -83,9 +95,9 @@ public slots:
     void handle_new_user_input();
 
 signals:
-    // Notifies user_input changes
-    // user_inputが変わったら通知
-    void user_inputChanged();
+    // Notifies userInput changes
+    // userInputが変わったら通知
+    void userInputChanged();
 
     // Called to request generation with prepared messages
     // 準備されたメッセージで推論を行うようリクエスト
@@ -97,28 +109,38 @@ signals:
 
     // Informs IP/port changes
     // IPアドレス/ポート番号が変わったことを通知
-    void ip_addressChanged();
-    void port_numberChanged();
+    void ipAddressChanged();
+    void portNumberChanged();
 
     // Informs local/remote init status changes
     // ローカル/リモート初期化状態が変わったことを通知
-    void local_initializedChanged();
-    void remote_initializedChanged();
+    void localInitializedChanged();
+    void remoteInitializedChanged();
 
-    void inferenceErrorToQML(const QString& error_message);
+    void inferenceErrorToQML(const QString& errorMessage);
+
+    void remoteAiInErrorChanged();
+
+    void localAiInErrorChanged();
+
+    void inProgressChanged();
 
 private slots:
     // Receives partial AI response
     // 部分的なAI応答を受け取る
-    void onPartialResponse(const QString &text_so_far);
+    void onPartialResponse(const QString &textSoFar);
 
     // Receives final AI response
     // 最終的なAI応答を受け取る
-    void onGenerationFinished(const QString &final_response);
+    void onGenerationFinished(const QString &finalResponse);
 
     // Called after engine init is done
     // エンジン初期化完了後に呼ばれる
     void onEngineInitFinished();
+
+    void onInferenceError(const QString& errorMessage);
+
+    void reinitLocalEngine();
 
 private:
     // Runs heavy init in another thread
@@ -127,7 +149,7 @@ private:
 
     // Immediately switch between local/remote
     // ローカル/リモートを即時切り替え
-    void doImmediateEngineSwitch(EngineMode new_mode);
+    void doImmediateEngineSwitch(EngineMode newMode);
 
     // Internal configuration helpers
     // 内部的な設定用ヘルパー
@@ -138,58 +160,85 @@ private:
 
     // Not meant to be called by QML
     // QMLからは呼ばれない想定
-    void setCurrentEngineMode(EngineMode new_current_engine_mode);
+    void setCurrentEngineMode(EngineMode newCurrentEngineMode);
 
     // Constants (English/Japanese)
     // 定数
-    static constexpr int m_n_gl {99};
-    static constexpr int m_n_ctx {2048};
+    static constexpr int mNGl {99};
+    static constexpr int mNCtx {2048};
 
     // Default LLaMA model path from CMake
     // CMakeで指定したデフォルトLLaMAモデルパス
-    static const std::string m_model_path;
+    static const std::string mModelPath;
 
     // LLaMA model/context parameters
     // LLaMAモデル/コンテキストのパラメータ
-    llama_model_params m_model_params;
-    llama_model* m_model {nullptr};
-    llama_context_params m_ctx_params;
-    llama_context* m_ctx {nullptr};
+    llama_model_params mModelParams;
+    llama_model* mModel {nullptr};
+    llama_context_params mCtxParams;
+    llama_context* mCtx {nullptr};
 
     // Engines: local / remote
     // エンジン(ローカル/リモート)
-    LlamaResponseGenerator* m_local_generator {nullptr};
-    LlamaResponseGeneratorReplica* m_remote_generator {nullptr};
+    LlamaResponseGenerator* mLocalGenerator {nullptr};
+    LlamaResponseGeneratorReplica* mRemoteGenerator {nullptr};
 
     // Remote connection
     // リモート接続設定
-    QString m_ip_address;
-    int m_port_number;
-    QRemoteObjectNode* m_remote_mode {nullptr};
+    QString mIpAddress;
+    int mPortNumber;
+    QRemoteObjectNode* mRemoteNode {nullptr};
 
     // Switch request mid-inference
     // 推論中に切り替え要求がきた場合の保管
-    std::optional<EngineMode> m_pending_engine_switch_mode;
-    EngineMode m_current_engine_mode {Mode_Uninitialized};
+    std::optional<EngineMode> mPendingEngineSwitchMode;
+    EngineMode mCurrentEngineMode {Mode_Uninitialized};
 
     // Worker thread for local inference
     // ローカル推論用ワーカースレッド
-    QThread* m_local_worker_thread {nullptr};
+    QThread* mLocalWorkerThread {nullptr};
 
     // Generation/inference flags
     // 推論状態フラグ
-    bool m_in_progress {false};
-    int m_current_assistant_index {-1};
+    bool mInProgress {false};
+    int mCurrentAssistantIndex {-1};
 
     // Chat data
     // チャットデータ
-    QString m_user_input;
-    ChatMessageModel m_messages;
+    QString mUserInput;
+    ChatMessageModel mMessages;
 
     // Engine init status
     // エンジン初期化ステータス
-    bool m_local_initialized {false};
-    bool m_remote_initialized {false};
+    bool mLocalInitialized {false};
+    bool mRemoteInitialized {false};
+
+    bool mRemoteAiInError {false};
+    bool mLocalAiInError {false};
+
+    void setupRemoteConnections();
+    void teardownRemoteConnections();
+    void setupLocalConnections();
+    void teardownLocalConnections();
+    void setupCommonConnections();
+    void teardownCommonConnections();
+
+    // common
+    std::optional<QMetaObject::Connection> mHandleNewUserInputConnection;
+
+    // remote
+    std::optional<QMetaObject::Connection> mRemoteInitializedConnection;
+    std::optional<QMetaObject::Connection> mRemoteRequestGenerationConnection;
+    std::optional<QMetaObject::Connection> mRemotePartialResponseConnection;
+    std::optional<QMetaObject::Connection> mRemoteGenerationFinishedConnection;
+    std::optional<QMetaObject::Connection> mRemoteGenerationErrorConnection;
+    std::optional<QMetaObject::Connection> mRemoteGenerationErrorToQmlConnection;
+    // local
+    std::optional<QMetaObject::Connection> mLocalRequestGenerationConnection;
+    std::optional<QMetaObject::Connection> mLocalPartialResponseConnection;
+    std::optional<QMetaObject::Connection> mLocalGenerationFinishedConnection;
+    std::optional<QMetaObject::Connection> mLocalGenerationErrorConnection;
+    std::optional<QMetaObject::Connection> mLocalGenerationErrorToQmlConnection;
 };
 
 #endif // LLAMACHATENGINE_H

@@ -203,6 +203,8 @@ qt6_add_qml_module(content
         fonts/fonts.txt
         icons/online.svg
         icons/offline.svg
+        icons/local_error.svg
+        icons/remote_error.svg
     SOURCES
         chatmessagemodel.cpp
         chatmessagemodel.h
