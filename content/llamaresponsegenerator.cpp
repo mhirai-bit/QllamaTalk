@@ -3,204 +3,196 @@
 
 /*
   Constructor:
-    - Stores llama_model/llama_context references
-    - Typically parent is nullptr if run in worker thread
+    - Stores llama_model / llama_context references
+    - Often parent is nullptr in worker thread usage
 
   コンストラクタ:
-    - llama_model/llama_context の参照を保持
+    - llama_model / llama_context の参照を保持
     - ワーカースレッドで使う場合、parent は通常 nullptr
 */
-LlamaResponseGenerator::LlamaResponseGenerator(QObject *parent,
-                                               llama_model *model,
-                                               llama_context *ctx)
+LlamaResponseGenerator::LlamaResponseGenerator(QObject* parent,
+                                               llama_model* model,
+                                               llama_context* ctx)
     : QObject(parent)
-    , mModel(model)
-    , mCtx(ctx)
+    , m_model(model)
+    , m_ctx(ctx)
 {
 }
 
 /*
   Destructor:
-    - Frees m_sampler if allocated
+    - Frees sampler if allocated
 
   デストラクタ:
-    - m_sampler が作成済みなら解放
+    - サンプラーが作成されていれば解放
 */
 LlamaResponseGenerator::~LlamaResponseGenerator()
 {
-    if (mSampler) {
-        llama_sampler_free(mSampler);
+    if (m_sampler) {
+        llama_sampler_free(m_sampler);
+        m_sampler = nullptr;
     }
 }
 
 /*
   generate(...):
-    - Invoked in worker thread to produce text from given messages
-    - Emits partialResponseReady for incremental output
-    - Emits generationFinished when complete
+    - Called (usually in worker thread) to produce text from messages
+    - Emits partialResponseReady(...) for incremental output
+    - Emits generationFinished(...) when complete
 
   generate(...):
-    - ワーカースレッドで呼び出され、与えられたメッセージ群からテキスト生成を行う
-    - 部分的な結果は partialResponseReady、最終結果は generationFinished を emit
+    - （通常ワーカースレッドで）メッセージからテキスト生成
+    - 部分的な出力は partialResponseReady(...) をemit
+    - 完了時に generationFinished(...) をemit
 */
 void LlamaResponseGenerator::generate(const QList<LlamaChatMessage>& messages)
 {
-    // Initialize sampler on first call
-    // 初回呼び出し時にサンプラー初期化
-    if (!mSampler) {
-        initialize_sampler();
+    // If sampler not ready, initialize once
+    // サンプラー未初期化なら1度だけ初期化
+    if (!m_sampler) {
+        initializeSampler();
     }
 
-    qDebug() << "About to QMetaObject::invokeMethod(generate). messages.size() ="
-             << messages.size();
+    qDebug() << "[LlamaResponseGenerator::generate] messages.size() =" << messages.size();
 
-    // Use static buffers to hold formatted text / prev length
-    // フォーマットされたテキストや前回長さをstatic変数で保持
-    static std::vector<char> formattedVec(llama_n_ctx(mCtx));
+    // Use static buffers to hold formatted text and track previous length
+    // フォーマット済みテキストや前回長さをstaticで保持
+    static std::vector<char> formattedVec(llama_n_ctx(m_ctx));
     static int prevLen {0};
 
-    // Convert input messages to llama_chat_message vector
-    // 入力メッセージを llama_chat_message のベクタに変換
-    std::vector<llama_chat_message> messagesForLlama = to_llama_messages(messages);
+    // Convert QList<LlamaChatMessage> → std::vector<llama_chat_message>
+    std::vector<llama_chat_message> llamaMsgs = toLlamaMessages(messages);
 
-    // Apply chat template
-    // チャットテンプレートを適用
-    int newLen = llama_chat_apply_template(
-        mModel, nullptr,
-        messagesForLlama.data(), messagesForLlama.size(),
-        true,
-        formattedVec.data(), formattedVec.size()
-        );
-
+    // Apply chat template to generate prompt
+    // チャットテンプレートを適用してプロンプト生成
+    int newLen = llama_chat_apply_template(m_model,
+                                           nullptr,
+                                           llamaMsgs.data(),
+                                           llamaMsgs.size(),
+                                           true,
+                                           formattedVec.data(),
+                                           formattedVec.size());
     if (newLen > static_cast<int>(formattedVec.size())) {
+        // Resize if needed
         formattedVec.resize(newLen);
-        newLen = llama_chat_apply_template(
-            mModel, nullptr,
-            messagesForLlama.data(), messagesForLlama.size(),
-            true,
-            formattedVec.data(), formattedVec.size()
-            );
+        newLen = llama_chat_apply_template(m_model,
+                                           nullptr,
+                                           llamaMsgs.data(),
+                                           llamaMsgs.size(),
+                                           true,
+                                           formattedVec.data(),
+                                           formattedVec.size());
     }
     if (newLen < 0) {
-        fprintf(stderr, "Failed to apply chat template.\n");
+        fprintf(stderr, "[LlamaResponseGenerator] Failed to apply chat template.\n");
         return;
     }
 
-    // Extract new portion of prompt
-    // 新しく追加されたプロンプト部分を取り出す
+    // Extract newly added portion of prompt
+    // 新たに追加されたプロンプト部分を抜き出す
     std::string promptStd(formattedVec.begin() + prevLen,
                           formattedVec.begin() + newLen);
+
     std::string response;
+    const int nPromptTokens = -llama_tokenize(m_model,
+                                              promptStd.c_str(),
+                                              promptStd.size(),
+                                              nullptr,
+                                              0,
+                                              true,  // is_prefix
+                                              true); // is_bos
 
-    // Tokenize the prompt text
-    // プロンプトをトークナイズ
-    const int nPromptTokens = -llama_tokenize(
-        mModel,
-        promptStd.c_str(),
-        promptStd.size(),
-        nullptr,
-        0,
-        true,  // is_prefix
-        true   // is_bos
-        );
-
-    // Prepare tokens
-    // トークンのベクタ準備
+    // Allocate space for tokens
+    // トークンを格納
     std::vector<llama_token> promptTokens(nPromptTokens);
-    if (llama_tokenize(
-            mModel,
-            promptStd.c_str(),
-            promptStd.size(),
-            promptTokens.data(),
-            promptTokens.size(),
-            llama_get_kv_cache_used_cells(mCtx) == 0,
-            true) < 0)
-    {
+    if (llama_tokenize(m_model,
+                       promptStd.c_str(),
+                       promptStd.size(),
+                       promptTokens.data(),
+                       promptTokens.size(),
+                       llama_get_kv_cache_used_cells(m_ctx) == 0,
+                       true) < 0) {
         emit generationError("failed to tokenize the prompt");
     }
 
-    // Single batch for decode
-    // デコード用バッチを1つ作成
-    llama_batch batch = llama_batch_get_one(promptTokens.data(),
-                                            promptTokens.size());
+    // Prepare single batch for decoding
+    llama_batch batch = llama_batch_get_one(promptTokens.data(), promptTokens.size());
     llama_token newTokenId;
 
-    static constexpr int maxReplyTokens    {1024};
-    static constexpr int extraCutoffTokens {32};
-    int generatedTokenCount {0};
+    static constexpr int maxReplyTokens    = 1024;
+    static constexpr int extraCutoffTokens = 32;
+    int generatedTokenCount = 0;
 
     // Decode tokens until end-of-generation
-    // 終了トークンに達するまでトークンをデコード
+    // 終了トークンに達するまでデコードし続ける
     while (true) {
-        if (llama_decode(mCtx, batch)) {
+        if (llama_decode(m_ctx, batch)) {
             emit generationError("failed to decode");
             break;
         }
-        newTokenId = llama_sampler_sample(mSampler, mCtx, -1);
+        newTokenId = llama_sampler_sample(m_sampler, m_ctx, -1);
 
-        if (llama_token_is_eog(mModel, newTokenId)) {
+        // If end-of-generation token
+        if (llama_token_is_eog(m_model, newTokenId)) {
             break;
         }
 
         char buf[256] = {};
-        const int n = llama_token_to_piece(mModel, newTokenId, buf,
-                                           sizeof(buf), 0, true);
+        int n = llama_token_to_piece(m_model, newTokenId, buf, sizeof(buf), 0, true);
         if (n < 0) {
             emit generationError("failed to convert token to piece");
             break;
         }
 
         std::string piece(buf, n);
-        printf("%s", piece.c_str());
-        fflush(stdout);
-
         response += piece;
+
+        // Emit partial text
         emit partialResponseReady(QString::fromStdString(response));
 
-        // Add next token to batch
-        // 次のトークンをバッチに追加
+        // Prepare for next token
         batch = llama_batch_get_one(&newTokenId, 1);
 
         ++generatedTokenCount;
         if (generatedTokenCount > maxReplyTokens) {
+            // Cut off if too long (end on newline or extra tokens)
             if (piece.find('\n') != std::string::npos) {
-                qDebug() << "Cutting off the generation at a newline character";
+                qDebug() << "[LlamaResponseGenerator] Cutting off at newline.";
                 break;
             } else if (generatedTokenCount > maxReplyTokens + extraCutoffTokens) {
-                qDebug() << "Cutting off the generation +"
-                         << extraCutoffTokens
-                         << " tokens";
+                qDebug() << "[LlamaResponseGenerator] Cutting off after extra tokens.";
                 break;
             }
         }
     }
 
-    // Update prevLen for next
-    // 次の生成に備えて prev_len を更新
-    prevLen = llama_chat_apply_template(
-        mModel, nullptr,
-        messagesForLlama.data(), messagesForLlama.size(),
-        false,
-        nullptr, 0
-        );
+    // Update prevLen for next call
+    prevLen = llama_chat_apply_template(m_model,
+                                        nullptr,
+                                        llamaMsgs.data(),
+                                        llamaMsgs.size(),
+                                        false,
+                                        nullptr,
+                                        0);
     if (prevLen < 0) {
-        fprintf(stderr, "Failed to apply chat template.\n");
+        fprintf(stderr, "[LlamaResponseGenerator] Failed to apply chat template.\n");
     }
 
+    // Finally emit finished text
     emit generationFinished(QString::fromStdString(response));
 }
 
 /*
-  to_llama_messages():
-    - Converts from QList<LlamaChatMessage> to std::vector<llama_chat_message>
+  toLlamaMessages(...):
+    - Helper to convert from QList<LlamaChatMessage> to std::vector<llama_chat_message>
     - Freed automatically if needed
 
-  to_llama_messages():
-    - QList<LlamaChatMessage> を std::vector<llama_chat_message> に変換
-    - 必要なら自動的に解放される
+  toLlamaMessages(...):
+    - QList<LlamaChatMessage> から std::vector<llama_chat_message> へ変換
+    - 必要なければ自動解放される
 */
 std::vector<llama_chat_message>
-LlamaResponseGenerator::to_llama_messages(const QList<LlamaChatMessage> &userMessages)
+LlamaResponseGenerator::toLlamaMessages(const QList<LlamaChatMessage> &userMessages)
 {
     std::vector<llama_chat_message> llamaMessages;
     llamaMessages.reserve(userMessages.size());
@@ -215,18 +207,18 @@ LlamaResponseGenerator::to_llama_messages(const QList<LlamaChatMessage> &userMes
 }
 
 /*
-  initialize_sampler():
-    - Sets up default chain of sampler modules
-    - Called once before generation if no sampler exists
+  initializeSampler():
+    - Sets up a default chain of sampler modules
+    - Called once if no sampler exists
 
-  initialize_sampler():
-    - デフォルトのサンプラーチェーンを構築
-    - サンプラーが無い場合、生成前に一度だけ呼ばれる
+  initializeSampler():
+    - デフォルトのサンプラーチェーンを作成
+    - まだサンプラーがなければ初回のみ呼ばれる
 */
-void LlamaResponseGenerator::initialize_sampler()
+void LlamaResponseGenerator::initializeSampler()
 {
-    mSampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
-    llama_sampler_chain_add(mSampler, llama_sampler_init_min_p(0.05f, 1));
-    llama_sampler_chain_add(mSampler, llama_sampler_init_temp(0.8f));
-    llama_sampler_chain_add(mSampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
+    m_sampler = llama_sampler_chain_init(llama_sampler_chain_default_params());
+    llama_sampler_chain_add(m_sampler, llama_sampler_init_min_p(0.05f, 1));
+    llama_sampler_chain_add(m_sampler, llama_sampler_init_temp(0.8f));
+    llama_sampler_chain_add(m_sampler, llama_sampler_init_dist(LLAMA_DEFAULT_SEED));
 }

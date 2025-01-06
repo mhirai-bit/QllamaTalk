@@ -8,64 +8,62 @@
 
 /*
   LlamaResponseGenerator:
-    - Generates text using a LLaMA model and context, typically in a worker thread
-    - Emits partial/final results for incremental updates
+    - Generates text using a LLaMA model/context (often in a worker thread)
+    - Emits partial/final signals for incremental updates
 
-  LLaMAモデルとコンテキストを用いてテキスト生成を行うクラス。
-  ワーカースレッドで動作し、途中経過と最終結果をシグナルで通知する。
+  LlamaResponseGeneratorクラス:
+    - LLaMAのモデル/コンテキストを用いてテキスト生成（多くの場合ワーカースレッドで動作）
+    - 部分的な更新や最終結果をシグナルで通知
 */
-class LlamaResponseGenerator : public QObject {
+class LlamaResponseGenerator : public QObject
+{
     Q_OBJECT
 
 public:
-    // Constructor is disabled if model/context not provided
-    // モデル/コンテキストが提供されない場合はコンストラクタを無効化
-    LlamaResponseGenerator() = delete;
+    //--------------------------------------------------------------------------
+    // Constructor / Destructor
+    // コンストラクタ / デストラクタ
+    //--------------------------------------------------------------------------
+    LlamaResponseGenerator() = delete;  // No default construction if no model/ctx
 
-    // Constructor: takes optional parent plus llama_model/llama_context
-    // コンストラクタ: 親と llama_model/llama_context を受け取る
-    explicit LlamaResponseGenerator(QObject *parent = nullptr,
+    explicit LlamaResponseGenerator(QObject* parent = nullptr,
                                     llama_model* model = nullptr,
                                     llama_context* ctx = nullptr);
 
-    // Destructor: frees sampler if created
-    // デストラクタ: 作成されたサンプラーがあれば解放
     ~LlamaResponseGenerator() override;
 
 public slots:
-    // Generates text from the given messages, emits partial/final
-    // 指定メッセージからテキスト生成し、途中/最終結果をemit
+    //--------------------------------------------------------------------------
+    // Generates text from the provided messages, emits partial/final signals
+    // 指定メッセージからテキストを生成し、途中・最終シグナルをemit
+    //--------------------------------------------------------------------------
     void generate(const QList<LlamaChatMessage>& messages);
 
 signals:
-    // Emitted during generation for incremental text
-    // 生成中に逐次テキストを通知
+    //--------------------------------------------------------------------------
+    // Signals for incremental / final output, or error
+    // インクリメンタル・最終出力、エラー用シグナル
+    //--------------------------------------------------------------------------
     void partialResponseReady(const QString &textSoFar);
-
-    // Emitted when generation is done
-    // 生成完了時に通知
     void generationFinished(const QString &finalResponse);
-
-    // Emitted on error (e.g., tokenization failure)
-    // エラー発生時に通知 (例: トークナイズ失敗)
     void generationError(const QString &errorMessage);
-
     void initialized();
 
 private:
-    // Holds LLaMA model/context/sampler references
-    // LLaMAのモデル/コンテキスト/サンプル参照
-    llama_model*   mModel   {nullptr};
-    llama_context* mCtx     {nullptr};
-    llama_sampler* mSampler {nullptr};
+    //--------------------------------------------------------------------------
+    // Private Helper Methods
+    // プライベートヘルパーメソッド
+    //--------------------------------------------------------------------------
+    void initializeSampler();
+    std::vector<llama_chat_message> toLlamaMessages(const QList<LlamaChatMessage> &userMessages);
 
-    // Initializes the sampler with default settings
-    // サンプラーをデフォルト設定で初期化
-    void initialize_sampler();
-
-    // Converts from QList<LlamaChatMessage> to std::vector<llama_chat_message>
-    // QList<LlamaChatMessage> → std::vector<llama_chat_message> に変換
-    std::vector<llama_chat_message> to_llama_messages(const QList<LlamaChatMessage> &user_messages);
+    //--------------------------------------------------------------------------
+    // Member Variables
+    // メンバ変数
+    //--------------------------------------------------------------------------
+    llama_model*   m_model   {nullptr};  // LLaMA model
+    llama_context* m_ctx     {nullptr};  // LLaMA context
+    llama_sampler* m_sampler {nullptr};  // LLaMA sampler
 };
 
 #endif // LLAMA_RESPONSE_GENERATOR_H
