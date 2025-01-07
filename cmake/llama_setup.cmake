@@ -63,8 +63,6 @@ endif()
 #
 
 if(APPLE)
-    # iOSかどうかを判定する適当な条件（下は例）
-    # CMAKE_OSX_SYSROOT に iPhoneOS が含まれていれば iOS と見なす
     if(IOS)
         set(LLAMA_BUILD_DIR "${LLAMA_SOURCE_DIR}/build_iOS")
         set(IOS_BUILD_OPTIONS
