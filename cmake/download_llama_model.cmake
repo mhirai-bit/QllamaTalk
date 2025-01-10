@@ -10,17 +10,18 @@ cmake_minimum_required(VERSION 3.16)
 
 # URL とファイル名を条件によって切り替える
 # (Switch the download URL and model file name depending on the platform)
-if(IOS)
-    # iOS用: より小さい 3B モデル
+if(IOS OR ANDROID)
+    # iOS: より小さい 3B モデル(Androidはサイズが1.6GBのモデルでもビルドに失敗するので、初回起動時にダウンロードする)
     # (For iOS: Use a smaller 3B model)
-    set(LLAMA_MODEL_URL "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-IQ3_M.gguf?download=true")
+    set(LLAMA_DOWNLOAD_URL "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-IQ3_M.gguf?download=true")
     set(LLAMA_MODEL_NAME "Llama-3.2-3B-Instruct-IQ3_M.gguf")
 else()
     # 非iOS用: これまでの 8B モデル
     # (For non-iOS: Use the existing 8B model)
-    set(LLAMA_MODEL_URL "https://huggingface.co/Triangle104/Llama-3.1-8B-Open-SFT-Q4_K_M-GGUF/resolve/main/llama-3.1-8b-open-sft-q4_k_m.gguf?download=true")
+    set(LLAMA_DOWNLOAD_URL "https://huggingface.co/Triangle104/Llama-3.1-8B-Open-SFT-Q4_K_M-GGUF/resolve/main/llama-3.1-8b-open-sft-q4_k_m.gguf?download=true")
     set(LLAMA_MODEL_NAME "llama-3.1-8b-open-sft-q4_k_m.gguf")
 endif()
+set(LLAMA_MODEL_URL ${LLAMA_DOWNLOAD_URL})
 
 # 出力先パスの設定
 # (Set the destination path for the downloaded model)

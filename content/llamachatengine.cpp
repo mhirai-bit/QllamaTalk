@@ -3,13 +3,29 @@
 #include <QThreadPool>
 #include <QRemoteObjectNode>
 #include <QtSystemDetection>
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
+#include <QNetworkReply>
+#include <QStandardPaths>
+#include <QDir>
+#include <QFile>
+#include <QEventLoop>
+#include <QTimer>
+#include <functional>
 #include "llamaresponsegenerator.h"
 #include "rep_LlamaResponseGenerator_replica.h"
+
 
 //------------------------------------------------------------------------------
 // Static: Default LLaMA model path
 // 静的メンバ: デフォルトLLaMAモデルパス
+//    → Androidの場合はあとで動的に設定するため、デスクトップ用にだけ適用
 //------------------------------------------------------------------------------
+#ifdef Q_OS_ANDROID
+// Android では最初は空文字にする (実際のパスは initializeModelPathForAndroid() で決める)
+const std::string LlamaChatEngine::mModelPath {""};
+#else
+// Windows/macOS/Linux/iOSなどの例 (従来通り)
 const std::string LlamaChatEngine::mModelPath {
 #ifdef LLAMA_MODEL_FILE
     LLAMA_MODEL_FILE
@@ -17,6 +33,7 @@ const std::string LlamaChatEngine::mModelPath {
 #error "LLAMA_MODEL_FILE is not defined. Please define it via target_compile_definitions() in CMake."
 #endif
 };
+#endif
 
 //------------------------------------------------------------------------------
 // Constructor: launch async engine init in threadpool
@@ -28,10 +45,17 @@ LlamaChatEngine::LlamaChatEngine(QObject *parent)
 {
     qSetMessagePattern("[%{file}:%{line}] %{message}");
 
+#ifdef Q_OS_ANDROID
+    // Android向け: 実行時にassetsからモデルファイルをコピー＆mModelPath設定
+    if (!initializeModelPathForAndroid()) {
+        qWarning() << "[LlamaChatEngine] Failed to initialize model path on Android!";
+    }
+#else
     // Run doEngineInit() in a background thread
     QThreadPool::globalInstance()->start([this]() {
         doEngineInit();
     });
+#endif
 }
 
 //------------------------------------------------------------------------------
@@ -42,6 +66,137 @@ LlamaChatEngine::~LlamaChatEngine()
 {
     llama_free(mCtx);
     llama_free_model(mModel);
+}
+
+//------------------------------------------------------------------------------
+// Android用モデル初期化
+//------------------------------------------------------------------------------
+bool LlamaChatEngine::initializeModelPathForAndroid()
+{
+#ifndef LLAMA_MODEL_FILE
+    qWarning() << "LLAMA_MODEL_FILE is not defined. Cannot proceed.";
+    return false;
+#endif
+
+#ifdef LLAMA_DOWNLOAD_URL
+    downloadModelIfNeededAsync();
+#else
+    qWarning() << "LLAMA_DOWNLOAD_URL is not defined. Cannot proceed.";
+    return false;
+#endif
+
+    return true;
+}
+
+//---------------------------------------------------------------------------
+// ダウンロードして "/data/data/<package>/files/LLAMA_MODEL_FILE" に保存
+//---------------------------------------------------------------------------
+void LlamaChatEngine::downloadModelIfNeededAsync()
+{
+    connect(this, &LlamaChatEngine::modelDownloadFinished,
+            this, &LlamaChatEngine::initAfterDownload);
+
+    // (0) Check if file already exists
+    QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (writableDir.isEmpty()) {
+        qWarning() << "[downloadModelIfNeededAsync] No writable directory found!";
+        // ダウンロード失敗を通知
+        QMetaObject::invokeMethod(this, [this](){
+            emit modelDownloadFinished(false);
+        }, Qt::QueuedConnection);
+        return;
+    }
+    QDir().mkpath(writableDir);
+
+    QString localModelPath = writableDir + "/" + LLAMA_MODEL_FILE;
+    if (QFile::exists(localModelPath)) {
+        qDebug() << "[downloadModelIfNeededAsync] Model already exists:" << localModelPath;
+        // 既にあるので成功扱い
+        QMetaObject::invokeMethod(this, [this](){
+            emit modelDownloadFinished(true);
+        }, Qt::QueuedConnection);
+        return;
+    }
+
+    // (1) ラムダでダウンロード処理を行う (同期だが別スレッドなのでUIはブロックされない)
+    auto task = [=]() {
+        qDebug() << "[downloadModelIfNeededAsync] Downloading from:" << LLAMA_DOWNLOAD_URL
+                 << "to:" << localModelPath;
+
+        QNetworkAccessManager manager;  // ローカルで作成
+        QNetworkRequest request( QUrl(QStringLiteral( LLAMA_DOWNLOAD_URL )) );
+        QNetworkReply* reply = manager.get(request);
+
+        connect(reply, &QNetworkReply::downloadProgress, this, [=](qint64 bytesReceived, qint64 bytesTotal) {
+            // (1) 進捗計算
+            int progress = 0.0;
+            if (bytesTotal > 0)
+                progress = (double)bytesReceived / (double)bytesTotal * 100;
+
+            // (2) メインスレッドへ発行するために QMetaObject::invokeMethod を使う
+            QMetaObject::invokeMethod(this, [this, progress]() {
+                // ここはUIスレッド (QueuedConnection)
+                // 例: シグナルを発行してQMLから受け取るなど
+                emit modelDownloadProgressChanged(progress);
+                qDebug() << "[downloadModelIfNeededAsync] Progress:" << progress;
+            }, Qt::QueuedConnection);
+        });
+
+
+        // 同期的に待つが、ここはスレッドプール内
+        QEventLoop loop;
+        QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+        loop.exec();
+
+        bool success = true;
+        if (reply->error() != QNetworkReply::NoError) {
+            qWarning() << "[downloadModelIfNeededAsync] Download error:" << reply->errorString();
+            success = false;
+        } else {
+            // ダウンロード成功 → ファイルに書き込み
+            QByteArray data = reply->readAll();
+            QFile outFile(localModelPath);
+            if (!outFile.open(QIODevice::WriteOnly)) {
+                qWarning() << "[downloadModelIfNeededAsync] Failed to open for writing:" << localModelPath;
+                success = false;
+            } else {
+                outFile.write(data);
+                outFile.close();
+                qDebug() << "[downloadModelIfNeededAsync] Model saved to:" << localModelPath;
+            }
+        }
+        reply->deleteLater();
+
+        // (2) メインスレッドに完了を通知 (modelDownloadFinishedシグナルを発行)
+        QMetaObject::invokeMethod(this, [this, success]() {
+            emit modelDownloadFinished(success);
+        }, Qt::QueuedConnection);
+    };
+
+    // (3) スレッドプールへ投入
+    QThreadPool::globalInstance()->start(task);
+}
+
+//-----------------------------------------------------------------------------
+// ダウンロード完了後に呼ばれるスロット (シグナル modelDownloadFinished で繋ぐ想定)
+//-----------------------------------------------------------------------------
+void LlamaChatEngine::initAfterDownload(bool success)
+{
+    if (!success) {
+        qWarning() << "[initAfterDownload] Model download failed, cannot proceed.";
+        return;
+    }
+
+    // (1) ダウンロード成功 → mModelPath に設定
+    QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QString localModelPath = writableDir + "/" + LLAMA_MODEL_FILE;
+    std::string *ptr = const_cast<std::string*>(&mModelPath);
+    *ptr = localModelPath.toStdString();
+
+    // (2) モデルロード開始
+    QThreadPool::globalInstance()->start([this]() {
+        doEngineInit();
+    });
 }
 
 //------------------------------------------------------------------------------
@@ -221,6 +376,13 @@ void LlamaChatEngine::doEngineInit()
 
     mModelParams = llama_model_default_params();
     mModelParams.n_gpu_layers = mNGl;
+
+    // ここで mModelPath を参照
+    if (mModelPath.empty()) {
+        qWarning() << "[doEngineInit] mModelPath is empty. Model cannot be loaded.";
+        return;
+    }
+    qDebug() << "[doEngineInit] Loading model from path:" << mModelPath.c_str();
 
     mModel = llama_load_model_from_file(mModelPath.c_str(), mModelParams);
     if (!mModel) {

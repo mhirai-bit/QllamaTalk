@@ -12,7 +12,23 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 # Enable referencing the downloaded gguf model file name from C++ code
 # ----------------------------------------------------------------------------
 target_compile_definitions(content PRIVATE
-    LLAMA_MODEL_FILE="${LLAMA_MODEL_NAME}"
+    LLAMA_MODEL_FILE=\"${LLAMA_MODEL_NAME}\"
+    LLAMA_DOWNLOAD_URL=\"${LLAMA_DOWNLOAD_URL}\"
+)
+
+message(STATUS "Check: listing directory = ${LLAMA_LIB_FILE_DIR}")
+execute_process(
+    COMMAND ls -la
+    WORKING_DIRECTORY "${LLAMA_LIB_FILE_DIR}"
+    OUTPUT_VARIABLE DIR_CONTENTS
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+message(STATUS "Dir content:\n${DIR_CONTENTS}")
+
+find_library(LLAMA_LIB
+    NAMES llama
+    PATHS "${LLAMA_LIB_FILE_DIR}"
+    NO_DEFAULT_PATH
 )
 
 # ----------------------------------------------------------------------------
@@ -24,16 +40,18 @@ if(NOT IOS)
     # For Windows/macOS/Linux, we find the llama and ggml libraries via find_library
 
     find_library(LLAMA_LIB
-        NAMES llama
+        NAMES llama libllama
         PATHS "${LLAMA_LIB_FILE_DIR}"
         NO_DEFAULT_PATH
+        NO_CMAKE_FIND_ROOT_PATH
         # 追加のパスがあれば追記 (Add extra paths here if necessary)
     )
 
     find_library(GGML_LIB
-        NAMES ggml
+        NAMES ggml libggml
         PATHS "${GGML_LIB_FILE_DIR}"
         NO_DEFAULT_PATH
+        NO_CMAKE_FIND_ROOT_PATH
         # 追加のパスがあれば追記 (Add extra paths here if necessary)
     )
 
@@ -164,8 +182,8 @@ elseif(APPLE)
         endforeach()
     endif()
 else()
-    # Linux / UNIX: .so をコピー
-    # Linux/UNIX: copy .so files
+    # Linux / UNIX / Android: .so をコピー
+    # Linux/UNIX/Android: copy .so files
 
     add_custom_command(TARGET content POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
@@ -223,14 +241,16 @@ target_link_libraries(content PRIVATE
     Qt6::RemoteObjects
 )
 
-# ----------------------------------------------------------------------------
-# ダウンロードした gguf モデルファイルをアプリ実行ファイルの横にコピー
-# Copy the downloaded gguf model file next to the app executable
-# ----------------------------------------------------------------------------
-add_custom_command(
-    TARGET content POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_CURRENT_LIST_DIR}/llama_models/${LLAMA_MODEL_NAME}"
-        "$<TARGET_FILE_DIR:QllamaTalkApp>"
-    COMMENT "Copying ${LLAMA_MODEL_NAME} next to the QllamaTalkApp binary"
-)
+if(NOT ANDROID)
+    # ----------------------------------------------------------------------------
+    # ダウンロードした gguf モデルファイルをアプリ実行ファイルの横にコピー
+    # Copy the downloaded gguf model file next to the app executable
+    # ----------------------------------------------------------------------------
+    add_custom_command(
+        TARGET content POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_LIST_DIR}/llama_models/${LLAMA_MODEL_NAME}"
+            "$<TARGET_FILE_DIR:QllamaTalkApp>"
+        COMMENT "Copying ${LLAMA_MODEL_NAME} next to the QllamaTalkApp binary"
+    )
+endif()

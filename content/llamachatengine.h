@@ -160,6 +160,8 @@ signals:
     void remoteAiInErrorChanged();
     void localAiInErrorChanged();
     void inProgressChanged();
+    void modelDownloadFinished(bool success);
+    void modelDownloadProgressChanged(int progress);
 
 private slots:
     //--------------------------------------------------------------------------
@@ -171,6 +173,7 @@ private slots:
     void onEngineInitFinished();
     void onInferenceError(const QString &errorMessage);
     void reinitLocalEngine();
+    void initAfterDownload(bool success);
 
 private:
     //--------------------------------------------------------------------------
@@ -184,6 +187,8 @@ private:
     void configureLocalSignalSlots();
     void configureRemoteObjects();
     void updateRemoteInitializationStatus();
+    bool initializeModelPathForAndroid();
+    void downloadModelIfNeededAsync();
 
     // Not called from QML
     // QMLからは呼ばない前提
