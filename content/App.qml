@@ -29,9 +29,6 @@ ApplicationWindow {
                 localAIErrorDialog.open()
             }
         }
-        onModelDownloadProgressChanged: function(progress) {
-            prog.text = progress
-        }
     }
 
 
@@ -206,12 +203,5 @@ ApplicationWindow {
                 }
             }
         }
-    }
-    Label {
-        id: prog
-        anchors.centerIn: parent
-        font.pixelSize: 50
-        text: "0"
-        color: "white"
     }
 }

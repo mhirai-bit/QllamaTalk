@@ -125,19 +125,37 @@ Rectangle {
         }
     }
 
-    BusyIndicator {
-        id: loadingSpinner
+    Column {
         anchors.centerIn: parent
-        // engine_initialized == false の間だけ表示 & 回転させる
-        visible: root.isRemote ? !LlamaChatEngine.remoteInitialized : !LlamaChatEngine.localInitialized
-        running: root.isRemote ? !LlamaChatEngine.remoteInitialized : !LlamaChatEngine.localInitialized
+        visible: !modelDownloadProgressIndicator.visible
+        BusyIndicator {
+            visible: root.isRemote ? !LlamaChatEngine.remoteInitialized : !LlamaChatEngine.localInitialized
+            running: visible
+        }
+
+        Label {
+            id: loadingText
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: qsTr("Loading AI...")
+            visible: root.isRemote ? !LlamaChatEngine.remoteInitialized : !LlamaChatEngine.localInitialized
+            color: "#f3f3f4"
+        }
     }
 
-    Text {
-        id: loadingText
+    Column {
+        id: modelDownloadProgressIndicator
         anchors.centerIn: parent
-        text: qsTr("Loading AI...")
-        visible: root.isRemote ? !LlamaChatEngine.remoteInitialized : !LlamaChatEngine.localInitialized
-        color: "#f3f3f4"
+        spacing: 8
+        visible: LlamaChatEngine.modelDownloadInProgress
+        ProgressBar {
+            from: 0.0
+            to: 1.0
+            value: LlamaChatEngine.modelDownloadProgress
+        }
+        Label {
+            anchors.horizontalCenter: parent.horizontalCenter
+            text: qsTr("Downloading model...")
+            color: "#f3f3f4"
+        }
     }
 }

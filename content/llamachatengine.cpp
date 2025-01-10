@@ -129,16 +129,15 @@ void LlamaChatEngine::downloadModelIfNeededAsync()
 
         connect(reply, &QNetworkReply::downloadProgress, this, [=](qint64 bytesReceived, qint64 bytesTotal) {
             // (1) 進捗計算
-            int progress = 0.0;
             if (bytesTotal > 0)
-                progress = (double)bytesReceived / (double)bytesTotal * 100;
+                mModelDownloadProgress = (double)bytesReceived / (double)bytesTotal;
 
             // (2) メインスレッドへ発行するために QMetaObject::invokeMethod を使う
-            QMetaObject::invokeMethod(this, [this, progress]() {
+            QMetaObject::invokeMethod(this, [this]() {
                 // ここはUIスレッド (QueuedConnection)
                 // 例: シグナルを発行してQMLから受け取るなど
-                emit modelDownloadProgressChanged(progress);
-                qDebug() << "[downloadModelIfNeededAsync] Progress:" << progress;
+                emit modelDownloadProgressChanged();
+                qDebug() << "[downloadModelIfNeededAsync] Progress:" << mModelDownloadProgress;
             }, Qt::QueuedConnection);
         });
 
@@ -149,6 +148,7 @@ void LlamaChatEngine::downloadModelIfNeededAsync()
         loop.exec();
 
         bool success = true;
+        setModelDownloadInProgress(false);
         if (reply->error() != QNetworkReply::NoError) {
             qWarning() << "[downloadModelIfNeededAsync] Download error:" << reply->errorString();
             success = false;
@@ -175,6 +175,7 @@ void LlamaChatEngine::downloadModelIfNeededAsync()
 
     // (3) スレッドプールへ投入
     QThreadPool::globalInstance()->start(task);
+    setModelDownloadInProgress(true);
 }
 
 //-----------------------------------------------------------------------------
@@ -520,6 +521,32 @@ void LlamaChatEngine::setCurrentEngineMode(EngineMode newCurrentEngineMode)
     }
     mCurrentEngineMode = newCurrentEngineMode;
     emit currentEngineModeChanged();
+}
+
+bool LlamaChatEngine::modelDownloadInProgress() const
+{
+    return mModelDownloadInProgress;
+}
+
+void LlamaChatEngine::setModelDownloadInProgress(bool newModelDownloadInProgress)
+{
+    if (mModelDownloadInProgress == newModelDownloadInProgress)
+        return;
+    mModelDownloadInProgress = newModelDownloadInProgress;
+    emit modelDownloadInProgressChanged();
+}
+
+double LlamaChatEngine::modelDownloadProgress() const
+{
+    return mModelDownloadProgress;
+}
+
+void LlamaChatEngine::setModelDownloadProgress(double newModelDownloadProgress)
+{
+    if (qFuzzyCompare(mModelDownloadProgress, newModelDownloadProgress))
+        return;
+    mModelDownloadProgress = newModelDownloadProgress;
+    emit modelDownloadProgressChanged();
 }
 
 //------------------------------------------------------------------------------

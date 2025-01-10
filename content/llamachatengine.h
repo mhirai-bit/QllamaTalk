@@ -78,6 +78,8 @@ class LlamaChatEngine : public QObject
                    READ inProgress
                        NOTIFY inProgressChanged
                            FINAL)
+    Q_PROPERTY(double modelDownloadProgress READ modelDownloadProgress NOTIFY modelDownloadProgressChanged FINAL)
+    Q_PROPERTY(bool modelDownloadInProgress READ modelDownloadInProgress NOTIFY modelDownloadInProgressChanged FINAL)
 
 public:
     //--------------------------------------------------------------------------
@@ -137,6 +139,12 @@ public:
     bool inProgress() const;
     void setInProgress(bool newInProgress);
 
+    double modelDownloadProgress() const;
+    void setModelDownloadProgress(double newModelDownloadProgress);
+
+    bool modelDownloadInProgress() const;
+    void setModelDownloadInProgress(bool newModelDownloadInProgress);
+
 public slots:
     //--------------------------------------------------------------------------
     // Public Slots
@@ -161,7 +169,9 @@ signals:
     void localAiInErrorChanged();
     void inProgressChanged();
     void modelDownloadFinished(bool success);
-    void modelDownloadProgressChanged(int progress);
+    void modelDownloadProgressChanged();
+
+    void modelDownloadInProgressChanged();
 
 private slots:
     //--------------------------------------------------------------------------
@@ -204,6 +214,10 @@ private:
     // Default LLaMA model path (defined via CMake)
     // CMakeで定義されたLLaMAモデルパス
     static const std::string mModelPath;
+
+    // modelをランタイムでダウンロードする際の進捗
+    double mModelDownloadProgress {0.0};
+    bool mModelDownloadInProgress {false};
 
     //--------------------------------------------------------------------------
     // LLaMA Model / Context
