@@ -139,6 +139,7 @@ Rectangle {
             text: qsTr("Loading AI...")
             visible: root.isRemote ? !LlamaChatEngine.remoteInitialized : !LlamaChatEngine.localInitialized
             color: "#f3f3f4"
+            font.pointSize: 14
         }
     }
 
@@ -156,6 +157,7 @@ Rectangle {
             anchors.horizontalCenter: parent.horizontalCenter
             text: qsTr("Downloading model...")
             color: "#f3f3f4"
+            font.pointSize: 14
         }
     }
 }

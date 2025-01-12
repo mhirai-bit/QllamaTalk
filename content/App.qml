@@ -87,14 +87,18 @@ ApplicationWindow {
                 // isRemote に基づいてアイコンを切り替え
                 source: mainWindow.isRemote ? "icons/online.svg" : "icons/offline.svg"
                 anchors.verticalCenter: headerRow.verticalCenter
+                height: connectionStatusLabel.height
+                width: height
             }
 
             Label {
+                id: connectionStatusLabel
                 // isRemote なら ipAddress:portNumber を表示
                 text: mainWindow.isRemote
                     ? qsTr("Remote") + " " + LlamaChatEngine.ipAddress + ":" + LlamaChatEngine.portNumber
                     : qsTr("Local")
                 anchors.verticalCenter: headerRow.verticalCenter
+                font.pointSize: 14
             }
 
             VectorImage {
@@ -102,6 +106,8 @@ ApplicationWindow {
                 visible: LlamaChatEngine.remoteAiInError
                 source: "icons/remote_error.svg"
                 anchors.verticalCenter: headerRow.verticalCenter
+                height: connectionStatusLabel.height
+                width: height
             }
 
             VectorImage {
@@ -109,6 +115,8 @@ ApplicationWindow {
                 visible: LlamaChatEngine.localAiInError
                 source: "icons/local_error.svg"
                 anchors.verticalCenter: headerRow.verticalCenter
+                height: connectionStatusLabel.height
+                width: height
             }
         }
 
@@ -142,7 +150,7 @@ ApplicationWindow {
                 id: connectionSettingText
                 text: qsTr("Connection Settings")
                 font.bold: true
-                font.pointSize: 16
+                font.pointSize: 24
             }
 
             Row {
@@ -152,12 +160,14 @@ ApplicationWindow {
                     id: modeLabel
                     text: qsTr("Engine Mode:")
                     anchors.verticalCenter: modeCombo.verticalCenter
+                    font.pointSize: 16
                 }
                 ComboBox {
                     id: modeCombo
                     width: modeLabel.width * 1.5
                     model: [qsTr("Local"), qsTr("Remote")]
                     currentIndex: mainWindow.isRemote ? 1 : 0
+                    font.pointSize: 16
                 }
             }
 
@@ -172,6 +182,7 @@ ApplicationWindow {
                     // 0~255の範囲もすべてはカバーできないシンプル例
                     regularExpression: /^(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)$/
                 }
+                font.pointSize: 16
             }
 
             // ポート入力フィールド (IntValidatorで範囲チェック)
@@ -184,6 +195,7 @@ ApplicationWindow {
                     bottom: 1
                     top: 65535
                 }
+                font.pointSize: 16
             }
 
             Button {
@@ -201,6 +213,7 @@ ApplicationWindow {
                     LlamaChatEngine.switchEngineMode(LlamaChatEngine.Mode_Remote)
                     settingsDrawer.close()
                 }
+                font.pointSize: 16
             }
         }
     }
