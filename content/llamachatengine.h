@@ -30,59 +30,76 @@ class LlamaChatEngine : public QObject
     QML_SINGLETON
 
     //--------------------------------------------------------------------------
-    // QML Properties
-    // QMLプロパティ
+    // QML Properties (QMLプロパティ)
     //--------------------------------------------------------------------------
     Q_PROPERTY(ChatMessageModel* messages
                    READ messages
                        CONSTANT)
+
     Q_PROPERTY(QString userInput
                    READ userInput
                        WRITE setUserInput
                            RESET resetUserInput
                                NOTIFY userInputChanged
                                    FINAL)
+
     Q_PROPERTY(EngineMode currentEngineMode
                    READ currentEngineMode
                        NOTIFY currentEngineModeChanged
                            FINAL)
+
     Q_PROPERTY(QString ipAddress
                    READ ipAddress
                        WRITE setIpAddress
                            NOTIFY ipAddressChanged
                                FINAL)
+
     Q_PROPERTY(int portNumber
                    READ portNumber
                        WRITE setPortNumber
                            NOTIFY portNumberChanged
                                FINAL)
+
     Q_PROPERTY(bool localInitialized
                    READ localInitialized
                        WRITE setLocalInitialized
                            NOTIFY localInitializedChanged
                                FINAL)
+
     Q_PROPERTY(bool remoteInitialized
                    READ remoteInitialized
                        WRITE setRemoteInitialized
                            NOTIFY remoteInitializedChanged
                                FINAL)
+
     Q_PROPERTY(bool remoteAiInError
                    READ remoteAiInError
                        NOTIFY remoteAiInErrorChanged
                            FINAL)
+
     Q_PROPERTY(bool localAiInError
                    READ localAiInError
                        NOTIFY localAiInErrorChanged
                            FINAL)
+
     Q_PROPERTY(bool inProgress
                    READ inProgress
                        NOTIFY inProgressChanged
                            FINAL)
 
+    Q_PROPERTY(double modelDownloadProgress
+                   READ modelDownloadProgress
+                       NOTIFY modelDownloadProgressChanged
+                           FINAL)
+
+    Q_PROPERTY(bool modelDownloadInProgress
+                   READ modelDownloadInProgress
+                       NOTIFY modelDownloadInProgressChanged
+                           FINAL)
+
 public:
     //--------------------------------------------------------------------------
-    // EngineMode Enum
-    // エンジンモード列挙 (ローカル / リモート / 未初期化)
+    // EngineMode Enum (エンジンモード列挙: ローカル/リモート/未初期化)
     //--------------------------------------------------------------------------
     enum EngineMode {
         Mode_Local,
@@ -99,14 +116,12 @@ public:
     ~LlamaChatEngine() override;
 
     //--------------------------------------------------------------------------
-    // Public QML-Invokable Methods
-    // QMLから呼び出せるpublicメソッド
+    // QML-Invokable Methods (QMLから呼び出せるpublicメソッド)
     //--------------------------------------------------------------------------
     Q_INVOKABLE void switchEngineMode(EngineMode mode);
 
     //--------------------------------------------------------------------------
-    // QML-Exposed Getters / Setters
-    // QMLに公開されるゲッター/セッター
+    // QML-Exposed Getters / Setters (QMLに公開されるゲッター/セッター)
     //--------------------------------------------------------------------------
     ChatMessageModel* messages();
 
@@ -137,17 +152,21 @@ public:
     bool inProgress() const;
     void setInProgress(bool newInProgress);
 
+    double modelDownloadProgress() const;
+    void setModelDownloadProgress(double newModelDownloadProgress);
+
+    bool modelDownloadInProgress() const;
+    void setModelDownloadInProgress(bool newModelDownloadInProgress);
+
 public slots:
     //--------------------------------------------------------------------------
-    // Public Slots
-    // 外部/QMLなどから呼ばれる可能性のあるSlots
+    // Public Slots (外部/QMLなどから呼ばれる可能性のあるSlots)
     //--------------------------------------------------------------------------
     void handle_new_user_input();
 
 signals:
     //--------------------------------------------------------------------------
-    // Signals
-    // シグナル
+    // Signals (シグナル)
     //--------------------------------------------------------------------------
     void userInputChanged();
     void requestGeneration(const QList<LlamaChatMessage>& messages);
@@ -160,22 +179,24 @@ signals:
     void remoteAiInErrorChanged();
     void localAiInErrorChanged();
     void inProgressChanged();
+    void modelDownloadFinished(bool success);
+    void modelDownloadProgressChanged();
+    void modelDownloadInProgressChanged();
 
 private slots:
     //--------------------------------------------------------------------------
-    // Internal Slots
-    // 内部で呼ばれるSlots
+    // Internal Slots (内部で呼ばれるSlots)
     //--------------------------------------------------------------------------
     void onPartialResponse(const QString &textSoFar);
     void onGenerationFinished(const QString &finalResponse);
     void onEngineInitFinished();
     void onInferenceError(const QString &errorMessage);
     void reinitLocalEngine();
+    void initAfterDownload(bool success);
 
 private:
     //--------------------------------------------------------------------------
-    // Private Helper Methods
-    // プライベートヘルパーメソッド
+    // Private Helper Methods (プライベートヘルパーメソッド)
     //--------------------------------------------------------------------------
     void doEngineInit();
     void doImmediateEngineSwitch(EngineMode newMode);
@@ -184,14 +205,12 @@ private:
     void configureLocalSignalSlots();
     void configureRemoteObjects();
     void updateRemoteInitializationStatus();
-
-    // Not called from QML
-    // QMLからは呼ばない前提
+    bool initializeModelPathForAndroid();
+    void downloadModelIfNeededAsync();
     void setCurrentEngineMode(EngineMode newCurrentEngineMode);
 
     //--------------------------------------------------------------------------
-    // Constants
-    // 定数
+    // Constants (定数)
     //--------------------------------------------------------------------------
     static constexpr int mNGl  {99};
     static constexpr int mNCtx {2048};
@@ -200,64 +219,60 @@ private:
     // CMakeで定義されたLLaMAモデルパス
     static const std::string mModelPath;
 
-    //--------------------------------------------------------------------------
-    // LLaMA Model / Context
-    // LLaMAモデル/コンテキスト
-    //--------------------------------------------------------------------------
-    llama_model_params mModelParams;
-    llama_model*       mModel    {nullptr};
-    llama_context_params mCtxParams;
-    llama_context*       mCtx    {nullptr};
+    // modelをランタイムでダウンロードする際の進捗
+    double mModelDownloadProgress {0.0};
+    bool   mModelDownloadInProgress {false};
 
     //--------------------------------------------------------------------------
-    // Engines: local or remote
-    // ローカル/リモートエンジン
+    // LLaMA Model / Context (LLaMAモデル/コンテキスト)
+    //--------------------------------------------------------------------------
+    llama_model_params mModelParams;
+    llama_model*       mModel          {nullptr};
+    llama_context_params mCtxParams;
+    llama_context*       mCtx          {nullptr};
+
+    //--------------------------------------------------------------------------
+    // Engines: local or remote (ローカル/リモートエンジン)
     //--------------------------------------------------------------------------
     LlamaResponseGenerator*        mLocalGenerator  {nullptr};
     LlamaResponseGeneratorReplica* mRemoteGenerator {nullptr};
     QRemoteObjectNode*             mRemoteNode      {nullptr};
 
     //--------------------------------------------------------------------------
-    // Connection Info
-    // 接続情報 (IP/ポート)
+    // Connection Info (接続情報 IP/ポート)
     //--------------------------------------------------------------------------
     QString mIpAddress;
     int     mPortNumber {0};
 
     //--------------------------------------------------------------------------
-    // Engine States
-    // エンジン状態管理
+    // Engine States (エンジン状態管理)
     //--------------------------------------------------------------------------
     std::optional<EngineMode> mPendingEngineSwitchMode;
     EngineMode                mCurrentEngineMode {Mode_Uninitialized};
+    QThread*                  mLocalWorkerThread {nullptr}; // Local inference thread
+    bool                      mInProgress        {false};   // Generation / Inference flag
+    int                       mCurrentAssistantIndex {-1};  // Index of current assistant in the chat model
 
-    // Local inference thread
-    // ローカル推論用スレッド
-    QThread* mLocalWorkerThread {nullptr};
-
-    // Generation / Inference flags
-    // 推論中かどうかなどのフラグ
-    bool mInProgress            {false};
-    int  mCurrentAssistantIndex {-1};
-
-    // Chat Data
-    // チャットデータ関連
+    //--------------------------------------------------------------------------
+    // Chat Data (チャットデータ関連)
+    //--------------------------------------------------------------------------
     QString          mUserInput;
     ChatMessageModel mMessages;
 
-    // Initialization status
-    // 初期化状態
+    //--------------------------------------------------------------------------
+    // Initialization status (初期化状態)
+    //--------------------------------------------------------------------------
     bool mLocalInitialized  {false};
     bool mRemoteInitialized {false};
 
-    // Error flags
-    // エラーフラグ
+    //--------------------------------------------------------------------------
+    // Error flags (エラーフラグ)
+    //--------------------------------------------------------------------------
     bool mRemoteAiInError {false};
     bool mLocalAiInError  {false};
 
     //--------------------------------------------------------------------------
-    // Connection Storage
-    // 接続情報を保持
+    // Connection Storage (接続情報を保持)
     //--------------------------------------------------------------------------
     // (common)
     std::optional<QMetaObject::Connection> mHandleNewUserInputConnection;

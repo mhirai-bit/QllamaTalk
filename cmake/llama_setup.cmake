@@ -62,9 +62,10 @@ endif()
 # ここでインストールはせず、ビルドだけ行います。
 #
 
+set(IOS_BUILD_OPTIONS "")
+set(ANDROID_BUILD_OPTIONS "")
+set(METAL_OPTION "")
 if(APPLE)
-    # iOSかどうかを判定する適当な条件（下は例）
-    # CMAKE_OSX_SYSROOT に iPhoneOS が含まれていれば iOS と見なす
     if(IOS)
         set(LLAMA_BUILD_DIR "${LLAMA_SOURCE_DIR}/build_iOS")
         set(IOS_BUILD_OPTIONS
@@ -82,13 +83,22 @@ if(APPLE)
         set(LLAMA_BUILD_DIR "${LLAMA_SOURCE_DIR}/build")
         # Metal を有効化
         set(METAL_OPTION "-DGGML_METAL=ON")
-        set(IOS_BUILD_OPTIONS "")
     endif()
+elseif(ANDROID)
+    set(LLAMA_BUILD_DIR "${LLAMA_SOURCE_DIR}/build_Android")
+    set(ANDROID_BUILD_OPTIONS
+        -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
+        -DANDROID_ABI=${ANDROID_ABI}
+        -DANDROID_PLATFORM=${ANDROID_PLATFORM}
+        -DCMAKE_C_FLAGS=${CMAKE_C_FLAGS}
+        -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+        -DGGML_OPENMP=OFF
+        -DGGML_LLAMAFILE=OFF
+        -DBUILD_SHARED_LIBS=ON
+    )
 else()
     # Windows / Linux / etc.
     set(LLAMA_BUILD_DIR "${LLAMA_SOURCE_DIR}/build")
-    set(METAL_OPTION "")
-    set(IOS_BUILD_OPTIONS "")
 endif()
 
 # stamp ファイルを置いてビルド済みかどうかの簡易チェックを行う
@@ -105,6 +115,7 @@ if(NOT EXISTS "${LLAMA_BUILD_STAMP}")
                 -B "${LLAMA_BUILD_DIR}"
                 -S "${LLAMA_SOURCE_DIR}"
                 ${IOS_BUILD_OPTIONS}
+                ${ANDROID_BUILD_OPTIONS}
                 ${METAL_OPTION}
                 # ここで必要に応じて CUDA / HIP / Vulkan / SYCL などのオプションを設定
         WORKING_DIRECTORY "${LLAMA_BUILD_DIR}"
@@ -144,7 +155,7 @@ elseif(APPLE)
     set(LLAMA_DYNAMIC_LIB_FILE_DIR    "${LLAMA_BUILD_DIR}/src")
     set(GGML_DYNAMIC_LIB_FILE_DIR     "${LLAMA_BUILD_DIR}/ggml/src")
 else()
-    # Linux / UNIX 系
+    # Linux / UNIX / Android 系
     set(LLAMA_LIB_FILE_DIR             "${LLAMA_BUILD_DIR}/src")
     set(GGML_LIB_FILE_DIR             "${LLAMA_BUILD_DIR}/ggml/src")
     set(LLAMA_DYNAMIC_LIB_FILE_DIR    "${LLAMA_BUILD_DIR}/src")
