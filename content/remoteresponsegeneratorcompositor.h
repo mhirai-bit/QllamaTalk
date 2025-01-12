@@ -19,6 +19,7 @@ public slots:
 
 private:
     RemoteGeneratorInterface* m_remoteGenerator {nullptr};
+    void setupQObjectConnections() override;
 };
 
 #endif // REMOTERESPONSEGENERATORCOMPOSITOR_H

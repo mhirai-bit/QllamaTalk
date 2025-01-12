@@ -15,6 +15,9 @@ public slots:
     void generate(const QList<LlamaChatMessage>& messages) override;
     void reinitEngine() override;
     bool remoteInitialized() const override;
+
+private:
+    void setupQObjectConnections() override;
 };
 
 #endif // QTWEBSOCKETSREMOTEGENERATOR_H

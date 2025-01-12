@@ -43,3 +43,8 @@ bool RemoteResponseGeneratorCompositor::remoteInitialized() const
 {
     return m_remoteGenerator->remoteInitialized();
 }
+
+void RemoteResponseGeneratorCompositor::setupQObjectConnections()
+{
+    // No-op
+}

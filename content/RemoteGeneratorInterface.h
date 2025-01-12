@@ -16,6 +16,9 @@ public slots:
     virtual void reinitEngine() = 0;
     virtual bool remoteInitialized() const = 0;
 
+protected:
+    virtual void setupQObjectConnections() = 0;
+
 signals:
     void partialResponseReady(const QString &textSoFar);
     void generationFinished(const QString &finalResponse);

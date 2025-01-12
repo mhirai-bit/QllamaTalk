@@ -26,27 +26,7 @@ bool QtRemoteObjectsRemoteGenerator::setupRemoteConnection(const QUrl& url)
     }
     mRemoteGenerator->setParent(this);
 
-    connect(mRemoteGenerator,
-            &LlamaResponseGeneratorReplica::remoteInitializedChanged,
-            this,
-            &RemoteGeneratorInterface::remoteInitializedChanged);
-
-    connect(mRemoteGenerator,
-            &LlamaResponseGeneratorReplica::partialResponseReady,
-            this,
-            &QtRemoteObjectsRemoteGenerator::partialResponseReady);
-    connect(mRemoteGenerator,
-            &LlamaResponseGeneratorReplica::generationFinished,
-            this,
-            &QtRemoteObjectsRemoteGenerator::generationFinished);
-    connect(mRemoteGenerator,
-            &LlamaResponseGeneratorReplica::generationError,
-            this,
-            &QtRemoteObjectsRemoteGenerator::generationError);
-    connect(mRemoteGenerator,
-            &LlamaResponseGeneratorReplica::remoteInitializedChanged,
-            this,
-            &QtRemoteObjectsRemoteGenerator::remoteInitializedChanged);
+    setupQObjectConnections();
 
     qDebug() << "[QtRemoteObjectsRemoteGenerator] Successfully acquired replica.";
     return true;
@@ -80,4 +60,29 @@ bool QtRemoteObjectsRemoteGenerator::remoteInitialized() const
     }
 
     return mRemoteGenerator->remoteInitialized();
+}
+
+void QtRemoteObjectsRemoteGenerator::setupQObjectConnections()
+{
+    connect(mRemoteGenerator,
+            &LlamaResponseGeneratorReplica::remoteInitializedChanged,
+            this,
+            &RemoteGeneratorInterface::remoteInitializedChanged);
+
+    connect(mRemoteGenerator,
+            &LlamaResponseGeneratorReplica::partialResponseReady,
+            this,
+            &QtRemoteObjectsRemoteGenerator::partialResponseReady);
+    connect(mRemoteGenerator,
+            &LlamaResponseGeneratorReplica::generationFinished,
+            this,
+            &QtRemoteObjectsRemoteGenerator::generationFinished);
+    connect(mRemoteGenerator,
+            &LlamaResponseGeneratorReplica::generationError,
+            this,
+            &QtRemoteObjectsRemoteGenerator::generationError);
+    connect(mRemoteGenerator,
+            &LlamaResponseGeneratorReplica::remoteInitializedChanged,
+            this,
+            &QtRemoteObjectsRemoteGenerator::remoteInitializedChanged);
 }

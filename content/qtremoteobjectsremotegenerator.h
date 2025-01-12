@@ -20,6 +20,8 @@ public slots:
 private:
     LlamaResponseGeneratorReplica* mRemoteGenerator {nullptr};
     QRemoteObjectNode*             mRemoteNode      {nullptr};
+
+    void setupQObjectConnections() override;
 };
 
 #endif // QTREMOTEOBJECTSREMOTEGENERATOR_H

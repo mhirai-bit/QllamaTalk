@@ -23,3 +23,8 @@ bool QtWebSocketsRemoteGenerator::remoteInitialized() const
 {
 
 }
+
+void QtWebSocketsRemoteGenerator::setupQObjectConnections()
+{
+
+}
