@@ -28,7 +28,10 @@ endif()
 # ----------------------------------------------------------------------------
 qt_add_executable(QllamaTalkApp
     src/main.cpp
-    android/AndroidManifest.xml android/build.gradle android/res/values/libs.xml android/res/xml/qtprovider_paths.xml
+    ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/AndroidManifest.xml
+    ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/build.gradle
+    ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/res/values/libs.xml
+    ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/res/xml/qtprovider_paths.xml
 )
 
 if(IOS)
@@ -48,7 +51,7 @@ if(IOS)
 endif()
 if(ANDROID)
     set_property(TARGET QllamaTalkApp PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
-                 "${CMAKE_CURRENT_SOURCE_DIR}/android")
+                 "${CMAKE_CURRENT_SOURCE_DIR}/platforms/android")
 
 endif()
 

@@ -31,8 +31,6 @@ ApplicationWindow {
         }
     }
 
-
-
     MessageDialog {
         id: remoteAIErrorDialog
         property string errorMessage: ""
