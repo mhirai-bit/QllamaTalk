@@ -110,3 +110,4 @@ models/
 # .env や認証情報系のファイルを使う場合
 .env
 .env.*
+*.drawio
