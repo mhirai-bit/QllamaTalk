@@ -1,6 +1,8 @@
 #ifndef QTWEBSOCKETSREMOTEGENERATOR_H
 #define QTWEBSOCKETSREMOTEGENERATOR_H
 
+#include <QUrl>
+#include <QWebSocket>
 #include "RemoteGeneratorInterface.h"
 #include "rep_LlamaResponseGenerator_replica.h"
 
@@ -18,6 +20,9 @@ public slots:
 
 private:
     void setupQObjectConnections() override;
+
+    QWebSocket  m_webSocket;   // 実際の WebSocket 通信オブジェクト
+    bool        m_remoteInitialized {false};
 };
 
 #endif // QTWEBSOCKETSREMOTEGENERATOR_H

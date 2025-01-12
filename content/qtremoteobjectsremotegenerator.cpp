@@ -55,11 +55,9 @@ void QtRemoteObjectsRemoteGenerator::reinitEngine()
 bool QtRemoteObjectsRemoteGenerator::remoteInitialized() const
 {
     if (!mRemoteGenerator) {
-        qWarning() << "[QtRemoteObjectsRemoteGenerator] Remote generator not available.";
         return false;
     }
-
-    return mRemoteGenerator->remoteInitialized();
+    mRemoteGenerator->remoteInitialized();
 }
 
 void QtRemoteObjectsRemoteGenerator::setupQObjectConnections()
@@ -81,8 +79,4 @@ void QtRemoteObjectsRemoteGenerator::setupQObjectConnections()
             &LlamaResponseGeneratorReplica::generationError,
             this,
             &QtRemoteObjectsRemoteGenerator::generationError);
-    connect(mRemoteGenerator,
-            &LlamaResponseGeneratorReplica::remoteInitializedChanged,
-            this,
-            &QtRemoteObjectsRemoteGenerator::remoteInitializedChanged);
 }
