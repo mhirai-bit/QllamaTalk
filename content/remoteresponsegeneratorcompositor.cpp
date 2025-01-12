@@ -24,9 +24,9 @@ RemoteResponseGeneratorCompositor::RemoteResponseGeneratorCompositor(QObject *pa
             &RemoteResponseGeneratorCompositor::remoteInitializedChanged);
 }
 
-bool RemoteResponseGeneratorCompositor::setupConnection(const QUrl &url)
+bool RemoteResponseGeneratorCompositor::setupRemoteConnection(const QUrl &url)
 {
-    return m_remoteGenerator->setupConnection(url);
+    return m_remoteGenerator->setupRemoteConnection(url);
 }
 
 void RemoteResponseGeneratorCompositor::generate(const QList<LlamaChatMessage> &messages)

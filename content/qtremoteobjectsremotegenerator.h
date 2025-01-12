@@ -12,7 +12,7 @@ public:
     explicit QtRemoteObjectsRemoteGenerator(QObject *parent = nullptr);
 
 public slots:
-    bool setupConnection(const QUrl& url) override;
+    bool setupRemoteConnection(const QUrl& url) override;
     void generate(const QList<LlamaChatMessage>& messages) override;
     void reinitEngine() override;
     bool remoteInitialized() const override;

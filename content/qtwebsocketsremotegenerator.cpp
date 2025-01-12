@@ -4,7 +4,7 @@ QtWebSocketsRemoteGenerator::QtWebSocketsRemoteGenerator(QObject *parent)
     : RemoteGeneratorInterface{parent}
 {}
 
-bool QtWebSocketsRemoteGenerator::setupConnection(const QUrl &url)
+bool QtWebSocketsRemoteGenerator::setupRemoteConnection(const QUrl &url)
 {
 
 }

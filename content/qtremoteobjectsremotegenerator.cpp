@@ -7,7 +7,7 @@ QtRemoteObjectsRemoteGenerator::QtRemoteObjectsRemoteGenerator(QObject *parent)
 {
 }
 
-bool QtRemoteObjectsRemoteGenerator::setupConnection(const QUrl& url)
+bool QtRemoteObjectsRemoteGenerator::setupRemoteConnection(const QUrl& url)
 {
     mRemoteNode = new QRemoteObjectNode(this);
 

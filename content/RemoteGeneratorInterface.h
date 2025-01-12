@@ -11,7 +11,7 @@ public:
     virtual ~RemoteGeneratorInterface() = default;
 
 public slots:
-    virtual bool setupConnection(const QUrl& url) = 0;
+    virtual bool setupRemoteConnection(const QUrl& url) = 0;
     virtual void generate(const QList<LlamaChatMessage>& messages) = 0;
     virtual void reinitEngine() = 0;
     virtual bool remoteInitialized() const = 0;
