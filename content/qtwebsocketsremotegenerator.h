@@ -20,6 +20,7 @@ public slots:
 
 private:
     void setupQObjectConnections() override;
+    void setRemoteInitialized(bool remoteInitialized);
 
     QWebSocket  m_webSocket;   // 実際の WebSocket 通信オブジェクト
     bool        m_remoteInitialized {false};

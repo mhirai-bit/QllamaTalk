@@ -145,7 +145,8 @@ void LlamaChatEngine::configureRemoteObjects()
         return;
     }
 
-    const bool result = mRemoteGenerator.setupRemoteConnection(QUrl(QStringLiteral("tcp://%1:%2").arg(mIpAddress).arg(mPortNumber)));
+    // const bool result = mRemoteGenerator.setupRemoteConnection(QUrl(QStringLiteral("tcp://%1:%2").arg(mIpAddress).arg(mPortNumber)));
+    const bool result = mRemoteGenerator.setupRemoteConnection(QUrl(QStringLiteral("ws://%1:%2").arg(mIpAddress).arg(mPortNumber)));
 
     if(result) {
         if (!mRemoteInitializedConnection.has_value()) {

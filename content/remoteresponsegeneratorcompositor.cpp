@@ -4,7 +4,8 @@
 
 RemoteResponseGeneratorCompositor::RemoteResponseGeneratorCompositor(QObject *parent)
     : RemoteGeneratorInterface{parent},
-      m_remoteGenerator{new QtRemoteObjectsRemoteGenerator{this}}
+      // m_remoteGenerator{new QtRemoteObjectsRemoteGenerator{this}}
+    m_remoteGenerator{new QtWebSocketsRemoteGenerator{this}}
 {
     connect(m_remoteGenerator,
             &RemoteGeneratorInterface::partialResponseReady,

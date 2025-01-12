@@ -101,16 +101,14 @@ void QtWebSocketsRemoteGenerator::setupQObjectConnections()
     connect(&m_webSocket, &QWebSocket::disconnected, this, [this](){
         qDebug() << "[QtWebSocketsRemoteGenerator] onDisconnected -> WebSocket closed.";
         // remoteInitialized の状態をリセット
-        m_remoteInitialized = false;
-        // 必要なら signals をエミットするなど
-        emit remoteInitializedChanged(m_remoteInitialized);
+        setRemoteInitialized(false);
     });
 
     // 3) エラー
     connect(&m_webSocket, QOverload<QAbstractSocket::SocketError>::of(&QWebSocket::errorOccurred),
             this, [this](QAbstractSocket::SocketError error){
                 qWarning() << "[QtWebSocketsRemoteGenerator] SocketError" << error << m_webSocket.errorString();
-                m_remoteInitialized = false;
+                setRemoteInitialized(false);
                 // 必要なら generationError() シグナルを飛ばすなど
                 emit generationError(m_webSocket.errorString());
             });
@@ -150,12 +148,20 @@ void QtWebSocketsRemoteGenerator::setupQObjectConnections()
                     // "initialized": bool
                     const bool initState = obj.value(QStringLiteral("initialized")).toBool();
                     if (m_remoteInitialized != initState) {
-                        m_remoteInitialized = initState;
-                        emit remoteInitializedChanged(m_remoteInitialized);
+                        setRemoteInitialized(initState);
                     }
 
                 } else {
                     qDebug() << "[QtWebSocketsRemoteGenerator] Received unknown action:" << action;
                 }
             });
+}
+
+void QtWebSocketsRemoteGenerator::setRemoteInitialized(bool remoteInitialized)
+{
+    if (m_remoteInitialized == remoteInitialized)
+        return;
+
+    m_remoteInitialized = remoteInitialized;
+    emit remoteInitializedChanged(m_remoteInitialized);
 }
