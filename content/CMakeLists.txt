@@ -1,5 +1,5 @@
 qt_add_library(content STATIC)
-find_package(Qt6 REQUIRED COMPONENTS Concurrent RemoteObjects)
+find_package(Qt6 REQUIRED COMPONENTS Concurrent RemoteObjects WebSockets)
 
 qt6_add_repc_replicas(content
     ../LLMServerQtRemoteObjects/QtRemoteObjectsFiles/LlamaResponseGenerator.rep
@@ -230,6 +230,13 @@ qt6_add_qml_module(content
         llamachatengine.cpp
         llamaresponsegenerator.h
         llamaresponsegenerator.cpp
+        remoteresponsegeneratorcompositor.h
+        remoteresponsegeneratorcompositor.cpp
+        qtwebsocketsremotegenerator.h
+        qtwebsocketsremotegenerator.cpp
+        qtremoteobjectsremotegenerator.h
+        qtremoteobjectsremotegenerator.cpp
+        RemoteGeneratorInterface.h
 )
 
 # ----------------------------------------------------------------------------
@@ -239,6 +246,7 @@ target_link_libraries(content PRIVATE
     ${ALL_LIBS}
     Qt6::Concurrent
     Qt6::RemoteObjects
+    Qt6::WebSockets
 )
 
 if(NOT ANDROID)
