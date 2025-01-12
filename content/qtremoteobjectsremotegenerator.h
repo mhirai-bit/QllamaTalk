@@ -1,7 +1,9 @@
 #ifndef QTREMOTEOBJECTSREMOTEGENERATOR_H
 #define QTREMOTEOBJECTSREMOTEGENERATOR_H
 
+#include <QRemoteObjectNode>
 #include "RemoteGeneratorInterface.h"
+#include "rep_LlamaResponseGenerator_replica.h"
 
 class QtRemoteObjectsRemoteGenerator : public RemoteGeneratorInterface
 {
@@ -9,7 +11,15 @@ class QtRemoteObjectsRemoteGenerator : public RemoteGeneratorInterface
 public:
     explicit QtRemoteObjectsRemoteGenerator(QObject *parent = nullptr);
 
-signals:
+public slots:
+    bool setupConnection(const QUrl& url) override;
+    void generate(const QList<LlamaChatMessage>& messages) override;
+    void reinitEngine() override;
+    bool remoteInitialized() const override;
+
+private:
+    LlamaResponseGeneratorReplica* mRemoteGenerator {nullptr};
+    QRemoteObjectNode*             mRemoteNode      {nullptr};
 };
 
 #endif // QTREMOTEOBJECTSREMOTEGENERATOR_H

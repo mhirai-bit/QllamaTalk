@@ -145,29 +145,19 @@ void LlamaChatEngine::configureRemoteObjects()
         return;
     }
 
-    mRemoteNode = new QRemoteObjectNode(this);
-    bool result = mRemoteNode->connectToNode(
-        QUrl(QStringLiteral("tcp://%1:%2").arg(mIpAddress).arg(mPortNumber))
-        );
+    const bool result = mRemoteGenerator.setupConnection(QUrl(QStringLiteral("tcp://%1:%2").arg(mIpAddress).arg(mPortNumber)));
 
-    if (result) {
-        qDebug() << "Connected to remote node.";
-        mRemoteGenerator = mRemoteNode->acquire<LlamaResponseGeneratorReplica>();
-        if (!mRemoteGenerator) {
-            qDebug() << "Failed to acquire remote generator.";
-        }
-        mRemoteGenerator->setParent(this);
-
+    if(result) {
         if (!mRemoteInitializedConnection.has_value()) {
             mRemoteInitializedConnection = connect(
-                mRemoteGenerator,
-                &LlamaResponseGeneratorReplica::remoteInitializedChanged,
+                &mRemoteGenerator,
+                &RemoteResponseGeneratorCompositor::remoteInitializedChanged,
                 this,
                 &LlamaChatEngine::updateRemoteInitializationStatus
                 );
         }
     } else {
-        qDebug() << "Failed to connect to remote node.";
+        qWarning() << "Failed to connect to the remote inference server at " << mIpAddress << ":" << mPortNumber;
     }
 }
 
@@ -177,13 +167,9 @@ void LlamaChatEngine::configureRemoteObjects()
 //------------------------------------------------------------------------------
 void LlamaChatEngine::updateRemoteInitializationStatus()
 {
-    if (!mRemoteGenerator) {
-        qDebug() << "No remote generator available.";
-        return;
-    }
-    qDebug() << "mRemoteGenerator->remoteInitialized():" << mRemoteGenerator->remoteInitialized();
+    qDebug() << "mRemoteGenerator->remoteInitialized():" << mRemoteGenerator.remoteInitialized();
 
-    if (mRemoteGenerator->remoteInitialized()) {
+    if (mRemoteGenerator.remoteInitialized()) {
         qDebug() << "Remote engine initialized.";
         setRemoteInitialized(true);
         setRemoteAiInError(false);
@@ -203,7 +189,7 @@ void LlamaChatEngine::doImmediateEngineSwitch(EngineMode newMode)
     if (newMode == Mode_Local) {
         configureLocalSignalSlots();
     } else {
-        if (!mRemoteGenerator) {
+        if(!mRemoteGenerator.remoteInitialized()) {
             configureRemoteObjects();
         }
         configureRemoteSignalSlots();
@@ -344,34 +330,30 @@ void LlamaChatEngine::teardownRemoteConnections()
 
 void LlamaChatEngine::setupRemoteConnections()
 {
-    if (!mRemoteGenerator) {
-        qWarning() << "No remote generator available. Cannot connect.";
-        return;
-    }
     teardownRemoteConnections();
 
     mRemoteRequestGenerationConnection = connect(
         this, &LlamaChatEngine::requestGeneration,
-        mRemoteGenerator, &LlamaResponseGeneratorReplica::generate
+        &mRemoteGenerator, &RemoteResponseGeneratorCompositor::generate
         );
 
     mRemotePartialResponseConnection = connect(
-        mRemoteGenerator, &LlamaResponseGeneratorReplica::partialResponseReady,
+        &mRemoteGenerator, &RemoteResponseGeneratorCompositor::partialResponseReady,
         this, &LlamaChatEngine::onPartialResponse
         );
 
     mRemoteGenerationFinishedConnection = connect(
-        mRemoteGenerator, &LlamaResponseGeneratorReplica::generationFinished,
+        &mRemoteGenerator, &RemoteResponseGeneratorCompositor::generationFinished,
         this, &LlamaChatEngine::onGenerationFinished
         );
 
     mRemoteGenerationErrorConnection = connect(
-        mRemoteGenerator, &LlamaResponseGeneratorReplica::generationError,
+        &mRemoteGenerator, &RemoteResponseGeneratorCompositor::generationError,
         this, &LlamaChatEngine::inferenceErrorToQML
         );
 
     mRemoteGenerationErrorToQmlConnection = connect(
-        mRemoteGenerator, &LlamaResponseGeneratorReplica::generationError,
+        &mRemoteGenerator, &RemoteResponseGeneratorCompositor::generationError,
         this, &LlamaChatEngine::onInferenceError
         );
 
@@ -467,9 +449,7 @@ void LlamaChatEngine::onInferenceError(const QString &errorMessage)
         });
     } else {
         setRemoteAiInError(true);
-        if (mRemoteGenerator) {
-            mRemoteGenerator->reinitEngine();
-        }
+        mRemoteGenerator.reinitEngine();
     }
 }
 

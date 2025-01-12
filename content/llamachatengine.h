@@ -10,6 +10,7 @@
 #include "chatmessagemodel.h"
 #include "llamaresponsegenerator.h"
 #include "rep_LlamaResponseGenerator_replica.h"
+#include "remoteresponsegeneratorcompositor.h"
 #include "llama.h"
 
 /*
@@ -235,8 +236,7 @@ private:
     // Engines: local or remote (ローカル/リモートエンジン)
     //--------------------------------------------------------------------------
     LlamaResponseGenerator*        mLocalGenerator  {nullptr};
-    LlamaResponseGeneratorReplica* mRemoteGenerator {nullptr};
-    QRemoteObjectNode*             mRemoteNode      {nullptr};
+    RemoteResponseGeneratorCompositor mRemoteGenerator;
 
     //--------------------------------------------------------------------------
     // Connection Info (接続情報 IP/ポート)
