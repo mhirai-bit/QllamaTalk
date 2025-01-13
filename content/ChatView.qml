@@ -147,7 +147,7 @@ Rectangle {
         id: modelDownloadProgressIndicator
         anchors.centerIn: parent
         spacing: 8
-        visible: LlamaChatEngine.modelDownloadInProgress
+        visible: root.isRemote ? false : LlamaChatEngine.modelDownloadInProgress
         ProgressBar {
             from: 0.0
             to: 1.0

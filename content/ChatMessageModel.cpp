@@ -1,5 +1,5 @@
 #include <stdlib.h>
-#include "chatmessagemodel.h"
+#include "ChatMessageModel.h"
 
 // Constructor: initializes an empty QAbstractListModel
 // コンストラクタ: 空のQAbstractListModelを初期化

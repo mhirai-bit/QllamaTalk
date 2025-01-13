@@ -1,10 +1,10 @@
 qt_add_library(content STATIC)
-find_package(Qt6 REQUIRED COMPONENTS Concurrent RemoteObjects)
+find_package(Qt6 REQUIRED COMPONENTS Concurrent RemoteObjects WebSockets)
 
 qt6_add_repc_replicas(content
-    ../LLMServerQtRemoteObjects/QtRemoteObjectsFiles/LlamaResponseGenerator.rep
+    ../LLMRemoteServer/QtRemoteObjectsFiles/LlamaResponseGenerator.rep
 )
-message(STATUS "rep file path = ${CMAKE_CURRENT_SOURCE_DIR}/LLMServerQtRemoteObjects/QtRemoteObjectsFiles/LlamaResponseGenerator.rep")
+message(STATUS "rep file path = ${CMAKE_CURRENT_SOURCE_DIR}/LLMRemoteServer/QtRemoteObjectsFiles/LlamaResponseGenerator.rep")
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 # ----------------------------------------------------------------------------
@@ -224,12 +224,19 @@ qt6_add_qml_module(content
         icons/local_error.svg
         icons/remote_error.svg
     SOURCES
-        chatmessagemodel.cpp
-        chatmessagemodel.h
-        llamachatengine.h
-        llamachatengine.cpp
-        llamaresponsegenerator.h
-        llamaresponsegenerator.cpp
+    ChatMessageModel.cpp
+        ChatMessageModel.h
+        LlamaChatEngine.h
+        LlamaChatEngine.cpp
+        LlamaResponseGenerator.h
+        LlamaResponseGenerator.cpp
+        RemoteResponseGeneratorCompositor.h
+        RemoteResponseGeneratorCompositor.cpp
+        QtWebSocketsRemoteGenerator.h
+        QtWebSocketsRemoteGenerator.cpp
+        QtRemoteObjectsRemoteGenerator.h
+        QtRemoteObjectsRemoteGenerator.cpp
+        RemoteGeneratorInterface.h
 )
 
 # ----------------------------------------------------------------------------
@@ -239,6 +246,7 @@ target_link_libraries(content PRIVATE
     ${ALL_LIBS}
     Qt6::Concurrent
     Qt6::RemoteObjects
+    Qt6::WebSockets
 )
 
 if(NOT ANDROID)
