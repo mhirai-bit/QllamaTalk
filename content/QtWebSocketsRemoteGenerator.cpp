@@ -9,7 +9,7 @@ QtWebSocketsRemoteGenerator::QtWebSocketsRemoteGenerator(QObject *parent)
     m_remoteInitialized(false)
 {
     // WebSocket のオプションや初期設定
-    // 例: m_webSocket.ignoreSslErrors() など
+    m_webSocket.ignoreSslErrors();
 }
 
 bool QtWebSocketsRemoteGenerator::setupRemoteConnection(QUrl url)
