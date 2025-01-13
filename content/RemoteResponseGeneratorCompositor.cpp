@@ -1,6 +1,6 @@
-#include "remoteresponsegeneratorcompositor.h"
-#include "qtremoteobjectsremotegenerator.h"
-#include "qtwebsocketsremotegenerator.h"
+#include "RemoteResponseGeneratorCompositor.h"
+#include "QtRemoteObjectsRemoteGenerator.h"
+#include "QtWebSocketsRemoteGenerator.h"
 
 RemoteResponseGeneratorCompositor::RemoteResponseGeneratorCompositor(QObject *parent)
     : RemoteGeneratorInterface{parent},

@@ -1,4 +1,4 @@
-#include "qtremoteobjectsremotegenerator.h"
+#include "QtRemoteObjectsRemoteGenerator.h"
 
 QtRemoteObjectsRemoteGenerator::QtRemoteObjectsRemoteGenerator(QObject *parent)
     : RemoteGeneratorInterface{parent}

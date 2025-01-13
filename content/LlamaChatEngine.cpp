@@ -1,4 +1,4 @@
-#include "llamachatengine.h"
+#include "LlamaChatEngine.h"
 #include <QThread>
 #include <QThreadPool>
 #include <QRemoteObjectNode>
@@ -12,7 +12,7 @@
 #include <QEventLoop>
 #include <QTimer>
 #include <functional>
-#include "llamaresponsegenerator.h"
+#include "LlamaResponseGenerator.h"
 #include "rep_LlamaResponseGenerator_replica.h"
 
 //------------------------------------------------------------------------------

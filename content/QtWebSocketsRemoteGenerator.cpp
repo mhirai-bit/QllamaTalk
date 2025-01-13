@@ -1,4 +1,4 @@
-#include "qtwebsocketsremotegenerator.h"
+#include "QtWebSocketsRemoteGenerator.h"
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>

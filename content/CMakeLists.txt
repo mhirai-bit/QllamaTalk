@@ -224,18 +224,18 @@ qt6_add_qml_module(content
         icons/local_error.svg
         icons/remote_error.svg
     SOURCES
-        chatmessagemodel.cpp
-        chatmessagemodel.h
-        llamachatengine.h
-        llamachatengine.cpp
-        llamaresponsegenerator.h
-        llamaresponsegenerator.cpp
-        remoteresponsegeneratorcompositor.h
-        remoteresponsegeneratorcompositor.cpp
-        qtwebsocketsremotegenerator.h
-        qtwebsocketsremotegenerator.cpp
-        qtremoteobjectsremotegenerator.h
-        qtremoteobjectsremotegenerator.cpp
+    ChatMessageModel.cpp
+        ChatMessageModel.h
+        LlamaChatEngine.h
+        LlamaChatEngine.cpp
+        LlamaResponseGenerator.h
+        LlamaResponseGenerator.cpp
+        RemoteResponseGeneratorCompositor.h
+        RemoteResponseGeneratorCompositor.cpp
+        QtWebSocketsRemoteGenerator.h
+        QtWebSocketsRemoteGenerator.cpp
+        QtRemoteObjectsRemoteGenerator.h
+        QtRemoteObjectsRemoteGenerator.cpp
         RemoteGeneratorInterface.h
 )
 

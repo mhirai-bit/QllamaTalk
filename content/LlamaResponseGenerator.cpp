@@ -1,4 +1,4 @@
-#include "llamaresponsegenerator.h"
+#include "LlamaResponseGenerator.h"
 #include <QDebug>
 
 /*

@@ -7,10 +7,10 @@
 #include <QRemoteObjectNode>
 #include <QThread>
 #include <QMetaObject>
-#include "chatmessagemodel.h"
-#include "llamaresponsegenerator.h"
+#include "ChatMessageModel.h"
+#include "LlamaResponseGenerator.h"
 #include "rep_LlamaResponseGenerator_replica.h"
-#include "remoteresponsegeneratorcompositor.h"
+#include "RemoteResponseGeneratorCompositor.h"
 #include "llama.h"
 
 /*
