@@ -42,7 +42,7 @@ QllamaTalk has been tested on the following setups:
 QllamaTalk supports both local and remote inference modes:
 
 **Local Mode**: Runs inference directly on your machine, using llama.cpp.<br>
-**Remote Mode**: Connects to a remote server via Qt Web Sockets. The remote server also provides Qt Remote Objects implementation, but the client(QllamaTalk) disables it. Having said that, the Qt Remote Server implementation works too. So you can enable it by instantiating the QtRemoteObjectsRemoteGenerator for m_remoteGenerator in the constructor of RemoteResponseGeneratorCompositor. The remote server also uses llama.cpp but runs in its own process or environment.
+**Remote Mode**: Connects to a remote server via Qt Web Sockets. The remote server also provides Qt Remote Objects implementation, but the client(QllamaTalk) disables it. Having said that, the Qt Remote Server implementation works too. So you can enable it by instantiating the QtRemoteObjectsRemoteGenerator for mRemoteGenerator in the constructor of RemoteResponseGeneratorCompositor. The remote server also uses llama.cpp but runs in its own process or environment.
 
 ### Switching Between Local & Remote
 In QML (or via your UI), you can switch between Local and Remote modes.

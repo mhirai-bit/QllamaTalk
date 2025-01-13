@@ -18,7 +18,7 @@ public slots:
     bool remoteInitialized() const override;
 
 private:
-    RemoteGeneratorInterface* m_remoteGenerator {nullptr};
+    RemoteGeneratorInterface* mRemoteGenerator {nullptr};
     void setupQObjectConnections() override;
 };
 

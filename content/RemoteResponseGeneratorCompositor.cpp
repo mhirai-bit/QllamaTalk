@@ -4,22 +4,22 @@
 
 RemoteResponseGeneratorCompositor::RemoteResponseGeneratorCompositor(QObject *parent)
     : RemoteGeneratorInterface{parent},
-      // m_remoteGenerator{new QtRemoteObjectsRemoteGenerator{this}}
-    m_remoteGenerator{new QtWebSocketsRemoteGenerator{this}}
+      // mRemoteGenerator{new QtRemoteObjectsRemoteGenerator{this}}
+    mRemoteGenerator{new QtWebSocketsRemoteGenerator{this}}
 {
-    connect(m_remoteGenerator,
+    connect(mRemoteGenerator,
             &RemoteGeneratorInterface::partialResponseReady,
             this,
             &RemoteResponseGeneratorCompositor::partialResponseReady);
-    connect(m_remoteGenerator,
+    connect(mRemoteGenerator,
             &RemoteGeneratorInterface::generationFinished,
             this,
             &RemoteResponseGeneratorCompositor::generationFinished);
-    connect(m_remoteGenerator,
+    connect(mRemoteGenerator,
             &RemoteGeneratorInterface::generationError,
             this,
             &RemoteResponseGeneratorCompositor::generationError);
-    connect(m_remoteGenerator,
+    connect(mRemoteGenerator,
             &RemoteGeneratorInterface::remoteInitializedChanged,
             this,
             &RemoteResponseGeneratorCompositor::remoteInitializedChanged);
@@ -27,22 +27,22 @@ RemoteResponseGeneratorCompositor::RemoteResponseGeneratorCompositor(QObject *pa
 
 bool RemoteResponseGeneratorCompositor::setupRemoteConnection(QUrl url)
 {
-    return m_remoteGenerator->setupRemoteConnection(url);
+    return mRemoteGenerator->setupRemoteConnection(url);
 }
 
 void RemoteResponseGeneratorCompositor::generate(const QList<LlamaChatMessage> &messages)
 {
-    m_remoteGenerator->generate(messages);
+    mRemoteGenerator->generate(messages);
 }
 
 void RemoteResponseGeneratorCompositor::reinitEngine()
 {
-    m_remoteGenerator->reinitEngine();
+    mRemoteGenerator->reinitEngine();
 }
 
 bool RemoteResponseGeneratorCompositor::remoteInitialized() const
 {
-    return m_remoteGenerator->remoteInitialized();
+    return mRemoteGenerator->remoteInitialized();
 }
 
 void RemoteResponseGeneratorCompositor::setupQObjectConnections()
