@@ -42,12 +42,12 @@ QllamaTalk has been tested on the following setups:
 QllamaTalk supports both local and remote inference modes:
 
 **Local Mode**: Runs inference directly on your machine, using llama.cpp.<br>
-**Remote Mode**: Connects to a remote server via Qt Remote Objects. The remote server also uses llama.cpp but runs in its own process or environment.
+**Remote Mode**: Connects to a remote server via Qt Web Sockets. The remote server also provides Qt Remote Objects implementation, but the client(QllamaTalk) disables it. Having said that, the Qt Remote Server implementation works too. So you can enable it by instantiating the QtRemoteObjectsRemoteGenerator for m_remoteGenerator in the constructor of RemoteResponseGeneratorCompositor. The remote server also uses llama.cpp but runs in its own process or environment.
 
 ### Switching Between Local & Remote
 In QML (or via your UI), you can switch between Local and Remote modes.
-If you supply ipAddress and portNumber, the app attempts to connect to a remote LLaMA server (e.g., tcp://192.168.0.120:12345).
-If the remote connection fails, QllamaTalk automatically falls back to local mode.
+If you supply ipAddress and portNumber, the app attempts to connect to a remote LLaMA server (e.g., tcp://192.168.0.120:12345). The Qt Remote Objects implementation in the server listens to the port 12345 and Qt WebSockets implementation listens to the port 12346. Multiple clients can connect to the latter.
+If the remote connection fails, QllamaTalk prompts you to fall back to local mode.
 ### Error Recovery
 When an inference error occurs (for example, if tokenization or decoding fails), QllamaTalk attempts to:
 
@@ -58,7 +58,7 @@ Fall back to local mode automatically (after some timeout).
 On the server side, a function such as reinitEngine() is called to free and recreate the LLaMA model context, ensuring the system can recover from a bad state. On the client side, LlamaChatEngine provides a similar reinitLocalEngine() method if local inference fails.
 
 ### How to build & run the server
-You can open the CMakeLists.txt inside LLMServerQtRemoteObjects folder. This is a git submodule.<br>
+You can open the CMakeLists.txt inside LLMRemoteServer folder. This is a git submodule.<br>
 This project has been tested with **macOS (Sonoma 14.3.1)** with **Qt 6.8.1 for macOS** . <br>
 You can build and run this server on your Mac and access it from the client.
 
@@ -74,6 +74,6 @@ You can build and run this server on your Mac and access it from the client.
    This crash is inconsistent. It tends not to occur with English text, but is more common with Japanese text, so it may be related to the model’s Japanese support.
 
 ## Future Plans
-1. HTTP-based server using QtHttpServer for remote inference
-2. Support embedded Linux environments
-3. Add voice input and output functionality
+1. Support embedded Linux environments
+2. Add voice input and output functionality
+3. Add cool AI-bot like effect in the screen or maybe 3D model of a person as if it's talking to you
