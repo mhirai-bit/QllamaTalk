@@ -25,7 +25,7 @@ RemoteResponseGeneratorCompositor::RemoteResponseGeneratorCompositor(QObject *pa
             &RemoteResponseGeneratorCompositor::remoteInitializedChanged);
 }
 
-bool RemoteResponseGeneratorCompositor::setupRemoteConnection(const QUrl &url)
+bool RemoteResponseGeneratorCompositor::setupRemoteConnection(QUrl url)
 {
     return m_remoteGenerator->setupRemoteConnection(url);
 }

@@ -145,10 +145,14 @@ void LlamaChatEngine::configureRemoteObjects()
         return;
     }
 
-    // const bool result = mRemoteGenerator.setupRemoteConnection(QUrl(QStringLiteral("tcp://%1:%2").arg(mIpAddress).arg(mPortNumber)));
-    const bool result = mRemoteGenerator.setupRemoteConnection(QUrl(QStringLiteral("ws://%1:%2").arg(mIpAddress).arg(mPortNumber)));
+    // --- QUrl にスキームを付けずにホスト名(IP)とポートだけを設定 ---
+    QUrl url;
+    url.setHost(mIpAddress);
+    url.setPort(mPortNumber);
 
-    if(result) {
+    const bool result = mRemoteGenerator.setupRemoteConnection(url);
+
+    if (result) {
         if (!mRemoteInitializedConnection.has_value()) {
             mRemoteInitializedConnection = connect(
                 &mRemoteGenerator,
@@ -158,9 +162,11 @@ void LlamaChatEngine::configureRemoteObjects()
                 );
         }
     } else {
-        qWarning() << "Failed to connect to the remote inference server at " << mIpAddress << ":" << mPortNumber;
+        qWarning() << "Failed to connect to the remote inference server at "
+                   << mIpAddress << ":" << mPortNumber;
     }
 }
+
 
 //------------------------------------------------------------------------------
 // updateRemoteInitializationStatus

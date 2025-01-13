@@ -7,10 +7,10 @@ QtRemoteObjectsRemoteGenerator::QtRemoteObjectsRemoteGenerator(QObject *parent)
 {
 }
 
-bool QtRemoteObjectsRemoteGenerator::setupRemoteConnection(const QUrl& url)
+bool QtRemoteObjectsRemoteGenerator::setupRemoteConnection(QUrl url)
 {
     mRemoteNode = new QRemoteObjectNode(this);
-
+    url.setScheme(QStringLiteral("tcp"));
     const bool result = mRemoteNode->connectToNode(url);
     if (!result) {
         qWarning() << "[QtRemoteObjectsRemoteGenerator] Could not connect to remote node at" << url;

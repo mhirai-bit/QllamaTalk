@@ -12,7 +12,7 @@ QtWebSocketsRemoteGenerator::QtWebSocketsRemoteGenerator(QObject *parent)
     // 例: m_webSocket.ignoreSslErrors() など
 }
 
-bool QtWebSocketsRemoteGenerator::setupRemoteConnection(const QUrl &url)
+bool QtWebSocketsRemoteGenerator::setupRemoteConnection(QUrl url)
 {
     // すでに接続されている場合はクローズして再接続するなどの対応
     if (m_webSocket.state() == QAbstractSocket::ConnectedState ||
@@ -25,6 +25,7 @@ bool QtWebSocketsRemoteGenerator::setupRemoteConnection(const QUrl &url)
     // setupQObjectConnections() は「シグナルとこのクラスのメソッドをつなげる」などを想定
     setupQObjectConnections();
 
+    url.setScheme(QStringLiteral("ws"));
     qDebug() << "[QtWebSocketsRemoteGenerator] Attempting to connect to:" << url;
     m_webSocket.open(url);
     // → openすると、非同期で onConnected() / onError() のようなシグナルが飛んでくる
