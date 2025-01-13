@@ -2,9 +2,9 @@ qt_add_library(content STATIC)
 find_package(Qt6 REQUIRED COMPONENTS Concurrent RemoteObjects WebSockets)
 
 qt6_add_repc_replicas(content
-    ../LLMServerQtRemoteObjects/QtRemoteObjectsFiles/LlamaResponseGenerator.rep
+    ../LLMRemoteServer/QtRemoteObjectsFiles/LlamaResponseGenerator.rep
 )
-message(STATUS "rep file path = ${CMAKE_CURRENT_SOURCE_DIR}/LLMServerQtRemoteObjects/QtRemoteObjectsFiles/LlamaResponseGenerator.rep")
+message(STATUS "rep file path = ${CMAKE_CURRENT_SOURCE_DIR}/LLMRemoteServer/QtRemoteObjectsFiles/LlamaResponseGenerator.rep")
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 # ----------------------------------------------------------------------------
