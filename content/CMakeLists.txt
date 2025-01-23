@@ -23,11 +23,26 @@ execute_process(
     OUTPUT_VARIABLE DIR_CONTENTS
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-message(STATUS "Dir content:\n${DIR_CONTENTS}")
+message(STATUS "Llama library dir content:\n${DIR_CONTENTS}")
+
+message(STATUS "Check: listing directory = ${WHISPER_LIB_FILE_DIR}")
+execute_process(
+    COMMAND ls -la
+    WORKING_DIRECTORY "${WHISPER_LIB_FILE_DIR}"
+    OUTPUT_VARIABLE DIR_CONTENTS
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+message(STATUS "Whisper library dir content:\n${DIR_CONTENTS}")
 
 find_library(LLAMA_LIB
     NAMES llama
     PATHS "${LLAMA_LIB_FILE_DIR}"
+    NO_DEFAULT_PATH
+)
+
+find_library(WHISPER_LIB
+    NAMES whisper
+    PATHS "${WHISPER_LIB_FILE_DIR}"
     NO_DEFAULT_PATH
 )
 
@@ -63,6 +78,12 @@ if(NOT IOS)
         message(FATAL_ERROR "Could not find llama library (e.g. llama.lib / libllama.dylib / libllama.so)")
     endif()
 
+    if(WHISPER_LIB)
+        message(STATUS "Found whisper library: ${WHISPER_LIB}")
+    else()
+        message(FATAL_ERROR "Could not find whisper library (e.g. whisper.lib / libwhisper.dylib / libwhisper.so)")
+    endif()
+
     if(GGML_LIB)
         message(STATUS "Found ggml library: ${GGML_LIB}")
     else()
@@ -71,6 +92,7 @@ if(NOT IOS)
 
     set(ALL_LIBS
         ${LLAMA_LIB}
+        ${WHISPER_LIB}
         ${GGML_LIB}
     )
 endif()
@@ -81,6 +103,7 @@ endif()
 target_include_directories(content PRIVATE
     ${CMAKE_SOURCE_DIR}/3rdparty/llama.cpp/include
     ${CMAKE_SOURCE_DIR}/3rdparty/llama.cpp/ggml/include
+    ${WHISPER_INCLUDE_DIR}
 )
 
 # ----------------------------------------------------------------------------
@@ -167,6 +190,13 @@ elseif(APPLE)
             "${LLAMA_DYNAMIC_LIB_FILE_DIR}/libllama.dylib"
             "$<TARGET_FILE_DIR:QllamaTalkApp>"
             COMMENT "Copying libllama.dylib to QllamaTalkApp"
+        )
+
+        add_custom_command(TARGET content POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${WHISPER_LIB_FILE_DIR}/libwhisper*.dylib"
+            "$<TARGET_FILE_DIR:QllamaTalkApp>"
+            COMMENT "Copying libwhisper*.dylib to Qllama"
         )
 
         file(GLOB GGML_DYLIBS
