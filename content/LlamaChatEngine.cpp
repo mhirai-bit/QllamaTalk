@@ -11,7 +11,6 @@
 #include <QFile>
 #include <QEventLoop>
 #include <QTimer>
-#include <functional>
 #include "LlamaResponseGenerator.h"
 #include "rep_LlamaResponseGenerator_replica.h"
 
