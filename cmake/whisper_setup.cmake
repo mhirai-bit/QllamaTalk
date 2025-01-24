@@ -1,6 +1,11 @@
 #
 # whisper_setup.cmake
 #
+# whisper.cpp のサブモジュールを設定し、指定されたコミットへチェックアウトし、
+# シンプルにビルドのみ行うサンプルです。
+# さらに、WHISPER_MODEL_PATH にあるモデルを QllamaTalkApp 実行ファイルの横にコピーし、
+# ファイル名を C++ から参照できるように定義する。
+#
 
 cmake_minimum_required(VERSION 3.15)
 
@@ -8,6 +13,11 @@ cmake_minimum_required(VERSION 3.15)
 # 1) whisper.cpp サブモジュールのパス
 # ----------------------------------------------------------------------------
 set(WHISPER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/whisper.cpp")
+
+# Whisperモデルファイル (例: base.en)
+set(WHISPER_MODEL_PATH "${WHISPER_SOURCE_DIR}/models/ggml-base.en.bin")
+# ファイル名だけ (C++から参照するため)
+set(WHISPER_MODEL_NAME "ggml-base.en.bin")
 
 # ----------------------------------------------------------------------------
 # 2) サブモジュール初期化 & 特定コミットへチェックアウト
@@ -45,19 +55,16 @@ if(NOT WHISPER_CURRENT_COMMIT STREQUAL WHISPER_TARGET_COMMIT)
 endif()
 
 # ----------------------------------------------------------------------------
-# 3) whisper.cpp に対するビルドオプション
+# 3) whisper.cpp に対するビルドオプション例
 # ----------------------------------------------------------------------------
 set(WHISPER_OPTION_BUILD_EXAMPLES "-DWHISPER_BUILD_EXAMPLES=OFF")
 set(WHISPER_OPTION_BUILD_TESTS    "-DWHISPER_BUILD_TESTS=OFF")
 set(WHISPER_OPTION_NO_INSTALL     "-DWHISPER_NO_INSTALL=ON")
 
 # ----------------------------------------------------------------------------
-# 4) Core ML 有効化のフラグ & モデル指定オプション
+# 4) Core ML 有効化のフラグ (Apple Silicon向けならON)
 # ----------------------------------------------------------------------------
 option(WHISPER_USE_COREML "Enable Core ML for whisper.cpp on Apple Silicon" ON)
-
-# 例: tiny.en / base.en / small.en / medium.en / large など
-set(WHISPER_COREML_MODEL_NAME "base.en" CACHE STRING "Model name for Core ML generation (ex: base.en, small.en, etc.)")
 
 # ----------------------------------------------------------------------------
 # 5) iOS / macOS / Android / その他 でオプションを分岐
@@ -65,7 +72,7 @@ set(WHISPER_COREML_MODEL_NAME "base.en" CACHE STRING "Model name for Core ML gen
 set(IOS_BUILD_OPTIONS "")
 set(ANDROID_BUILD_OPTIONS "")
 set(COREML_OPTION "")
-set(WHISPER_BUILD_DIR "${WHISPER_SOURCE_DIR}/build")  # デフォルト
+set(WHISPER_BUILD_DIR "${WHISPER_SOURCE_DIR}/build")
 
 if(APPLE)
     if(IOS)
@@ -77,13 +84,13 @@ if(APPLE)
             -DBUILD_SHARED_LIBS=OFF
         )
         if(WHISPER_USE_COREML)
-            set(COREML_OPTION "-DWHISPER_COREML=1")
+            # set(COREML_OPTION "-DWHISPER_COREML=1") # (無効化例)
         endif()
     else()
         # macOS (Apple Silicon など)
         set(WHISPER_BUILD_DIR "${WHISPER_SOURCE_DIR}/build_macOS")
         if(WHISPER_USE_COREML)
-            set(COREML_OPTION "-DWHISPER_COREML=1")
+            # set(COREML_OPTION "-DWHISPER_COREML=1") # (無効化例)
         endif()
     endif()
 elseif(ANDROID)
@@ -150,5 +157,22 @@ message(STATUS "WHISPER_BUILD_STAMP      = ${WHISPER_BUILD_STAMP}")
 message(STATUS "WHISPER_LIB_FILE_DIR     = ${WHISPER_LIB_FILE_DIR}")
 message(STATUS "WHISPER_INCLUDE_DIR      = ${WHISPER_INCLUDE_DIR}")
 message(STATUS "WHISPER_USE_COREML       = ${WHISPER_USE_COREML}")
-message(STATUS "WHISPER_COREML_MODEL_NAME= ${WHISPER_COREML_MODEL_NAME}")
+message(STATUS "WHISPER_MODEL_PATH       = ${WHISPER_MODEL_PATH}")
+message(STATUS "WHISPER_MODEL_NAME        = ${WHISPER_MODEL_NAME}")
 message(STATUS "------------------------------------------------")
+
+#
+# 9) モデルを QllamaTalkApp 実行ファイルの横にコピー
+#    (ここでは、QllamaTalkApp という名称のターゲットが存在すると仮定)
+#
+# 例: ${CMAKE_RUNTIME_OUTPUT_DIRECTORY} に実行ファイルが出る場合や
+#     add_executable(QllamaTalkApp ...) 後に TGT_FILE_DIR が利用できる
+#
+# ※ 上位で QllamaTalkApp を定義している必要があります
+#
+add_custom_command(TARGET QllamaTalkApp POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+        "${WHISPER_MODEL_PATH}"
+        "$<TARGET_FILE_DIR:QllamaTalkApp>/${WHISPER_MODEL_NAME}"
+    COMMENT "Copying Whisper model to QllamaTalkApp binary directory"
+)

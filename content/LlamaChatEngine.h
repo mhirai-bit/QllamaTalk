@@ -11,6 +11,8 @@
 #include "LlamaResponseGenerator.h"
 #include "rep_LlamaResponseGenerator_replica.h"
 #include "RemoteResponseGeneratorCompositor.h"
+#include "VoiceDetector.h"
+#include "VoiceRecognitionEngine.h"
 #include "llama.h"
 
 /*
@@ -194,6 +196,7 @@ private slots:
     void onInferenceError(const QString &errorMessage);
     void reinitLocalEngine();
     void initAfterDownload(bool success);
+    void handleRecognizedText(const QString &text);
 
 private:
     //--------------------------------------------------------------------------
@@ -209,6 +212,10 @@ private:
     bool initializeModelPathForAndroid();
     void downloadModelIfNeededAsync();
     void setCurrentEngineMode(EngineMode newCurrentEngineMode);
+
+    void initVoiceRecognition();
+    void startVoiceRecognition();
+    void stopVoiceRecognition();
 
     //--------------------------------------------------------------------------
     // Constants (定数)
@@ -291,6 +298,9 @@ private:
     std::optional<QMetaObject::Connection> mLocalGenerationFinishedConnection;
     std::optional<QMetaObject::Connection> mLocalGenerationErrorConnection;
     std::optional<QMetaObject::Connection> mLocalGenerationErrorToQmlConnection;
+
+    VoiceRecognitionEngine* m_voiceEngine = nullptr;
+    VoiceDetector*          m_voiceDetector = nullptr;
 
     // Additional helper connection setup/teardown
     void setupRemoteConnections();

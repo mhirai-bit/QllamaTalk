@@ -11,7 +11,6 @@ project(QllamaTalkApp LANGUAGES CXX)
 # ----------------------------------------------------------------------------
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_llama_model.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/llama_setup.cmake)
-include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/whisper_setup.cmake)
 
 set(CMAKE_AUTOMOC ON)
 
@@ -34,6 +33,8 @@ qt_add_executable(QllamaTalkApp
     ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/res/values/libs.xml
     ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/res/xml/qtprovider_paths.xml
 )
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/whisper_setup.cmake)
 
 if(IOS)
     set_target_properties(QllamaTalkApp

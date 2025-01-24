@@ -1,5 +1,5 @@
 qt_add_library(content STATIC)
-find_package(Qt6 REQUIRED COMPONENTS Concurrent RemoteObjects WebSockets)
+find_package(Qt6 REQUIRED COMPONENTS Concurrent RemoteObjects WebSockets Multimedia)
 
 qt6_add_repc_replicas(content
     ../LLMRemoteServer/QtRemoteObjectsFiles/LlamaResponseGenerator.rep
@@ -14,6 +14,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 target_compile_definitions(content PRIVATE
     LLAMA_MODEL_FILE=\"${LLAMA_MODEL_NAME}\"
     LLAMA_DOWNLOAD_URL=\"${LLAMA_DOWNLOAD_URL}\"
+    WHISPER_MODEL_NAME=\"${WHISPER_MODEL_NAME}\"
 )
 
 message(STATUS "Check: listing directory = ${LLAMA_LIB_FILE_DIR}")
@@ -254,7 +255,7 @@ qt6_add_qml_module(content
         icons/local_error.svg
         icons/remote_error.svg
     SOURCES
-    ChatMessageModel.cpp
+        ChatMessageModel.cpp
         ChatMessageModel.h
         LlamaChatEngine.h
         LlamaChatEngine.cpp
@@ -267,6 +268,13 @@ qt6_add_qml_module(content
         QtRemoteObjectsRemoteGenerator.h
         QtRemoteObjectsRemoteGenerator.cpp
         RemoteGeneratorInterface.h
+        VoiceRecognitionEngine.h
+        VoiceRecognitionEngine.cpp
+        VoiceDetector.h
+        VoiceDetector.cpp
+        common.h
+        common.cpp
+        dr_wav.h
 )
 
 # ----------------------------------------------------------------------------
@@ -277,6 +285,7 @@ target_link_libraries(content PRIVATE
     Qt6::Concurrent
     Qt6::RemoteObjects
     Qt6::WebSockets
+    Qt6::Multimedia
 )
 
 if(NOT ANDROID)

@@ -1,16 +1,27 @@
-// // Copyright (C) 2021 The Qt Company Ltd.
-// // SPDX-License-Identifier: LicenseRef-Qt-Commercial OR GPL-3.0-only
+// main.cpp
 
 #include <cstring>
-
 #include <QDebug>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickStyle>
+#include <QDirIterator>
 #include "app_environment.h"
 
-int main(int argc, char ** argv) {
+// リソースシステムに登録されているファイルのパスをすべて列挙する関数
+static void printAllResourcePaths()
+{
+    qDebug() << "----- List of all registered resources -----";
+    // ":/" という仮想ディレクトリから下位を再帰的に探索する
+    QDirIterator it(":/", QDirIterator::Subdirectories);
+    while (it.hasNext()) {
+        QString path = it.next();
+        qDebug() << path;
+    }
+    qDebug() << "--------------------------------------------";
+}
 
+int main(int argc, char ** argv) {
     set_qt_environment();
 
     QGuiApplication app(argc, argv);
@@ -36,6 +47,9 @@ int main(int argc, char ** argv) {
 #endif
 
     qDebug() << "style:" << QQuickStyle::name();
+
+    // リソースパスをすべてプリントアウト
+    printAllResourcePaths();
 
     QQmlApplicationEngine engine;
     const QUrl url(u"qrc:/qt/qml/Main/main.qml"_qs);

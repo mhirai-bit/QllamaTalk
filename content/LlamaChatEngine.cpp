@@ -54,6 +54,9 @@ LlamaChatEngine::LlamaChatEngine(QObject *parent)
         doEngineInit();
     });
 #endif
+
+    initVoiceRecognition();
+    startVoiceRecognition();
 }
 
 //------------------------------------------------------------------------------
@@ -627,6 +630,74 @@ void LlamaChatEngine::setCurrentEngineMode(EngineMode newCurrentEngineMode)
     }
     mCurrentEngineMode = newCurrentEngineMode;
     emit currentEngineModeChanged();
+}
+
+void LlamaChatEngine::initVoiceRecognition()
+{
+    if (m_voiceEngine) {
+        // すでに作ってたら再初期化など
+        delete m_voiceEngine;
+        m_voiceEngine = nullptr;
+    }
+    m_voiceEngine = new VoiceRecognitionEngine(this);
+
+    // Whisper設定
+    VoiceRecParams vrParams;
+    vrParams.language = "en";
+    vrParams.model    = WHISPER_MODEL_NAME;
+    vrParams.length_ms  = 10000;  // 10秒取りたい
+    vrParams.vad_thold  = 0.6f;
+    vrParams.freq_thold = 100.0f;
+    // ... GPU設定など
+
+    const bool ok = m_voiceEngine->initWhisper(vrParams);
+    if (!ok) {
+        qWarning() << "Failed to init VoiceRecognitionEngine";
+        return;
+    }
+
+    // シグナル接続: 音声認識結果 -> handleRecognizedText()
+    connect(m_voiceEngine, &VoiceRecognitionEngine::textRecognized,
+            this, &LlamaChatEngine::handleRecognizedText);
+
+    if (!m_voiceDetector) {
+        m_voiceDetector = new VoiceDetector(vrParams.length_ms, this);
+        // VoiceDetectorが音声を取得したら voiceEngine->addAudio(...) へ渡す
+        connect(m_voiceDetector, &VoiceDetector::audioAvailable,
+                m_voiceEngine, &VoiceRecognitionEngine::addAudio);
+        // VoiceDetectorの初期化 (例: init(16kHz), start capturing, etc.)
+        m_voiceDetector->init(/*sampleRate=*/16000, /*channelCount=*/1);
+    }
+}
+
+void LlamaChatEngine::startVoiceRecognition()
+{
+    if (!m_voiceEngine) {
+        initVoiceRecognition();
+    }
+    if (m_voiceDetector && !m_voiceEngine->isRunning()) {
+        // VoiceDetectorスタート
+        m_voiceDetector->resume();   // or start capturing
+        // VoiceRecognitionEngineスタート
+        m_voiceEngine->start();
+    }
+}
+
+void LlamaChatEngine::stopVoiceRecognition()
+{
+    if (m_voiceDetector) {
+        m_voiceDetector->pause(); // or stop
+    }
+    if (m_voiceEngine && m_voiceEngine->isRunning()) {
+        m_voiceEngine->stop();
+    }
+}
+
+void LlamaChatEngine::handleRecognizedText(const QString &text)
+{
+    // LlamaChatEngineの setUserInput を呼ぶ例
+    qDebug() << "[LlamaChatEngine] recognized text => setUserInput:" << text;
+    setUserInput(text);
 }
 
 //------------------------------------------------------------------------------
