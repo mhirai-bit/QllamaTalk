@@ -53,6 +53,7 @@ Item {
         height: internals.expanded ? contentHeight : 0
         spacing: 8
         opacity: internals.expanded ? 1.0 : 0.0
+        visible: internals.expanded
 
         Behavior on height {
             NumberAnimation {

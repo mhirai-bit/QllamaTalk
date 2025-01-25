@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 // main.qml
 import QtQuick
 import QtQuick.Controls
@@ -135,8 +137,6 @@ ApplicationWindow {
 
     TextToSpeech {
         id: tts
-        // TODO: GUIから色々設定変更できるようにする
-        volume: 10
 
         onStateChanged: {
             switch (state) {
@@ -167,10 +167,11 @@ ApplicationWindow {
         edge: Qt.LeftEdge
         width: drawerContent.width
         height: parent.height
+        opacity: 0.9
 
         Column {
             id: drawerContent
-            spacing: 16
+            spacing: 24
             padding: 20
 
             Expander {
@@ -258,6 +259,207 @@ ApplicationWindow {
                                 settingsDrawer.close()
                             }
                             font.pointSize: 16
+                        }
+                    }
+                ]
+            }
+
+            Expander {
+                id: voiceSettingsExpander
+                title: qsTr("Voice Settings")
+
+                property list<string> allLocales: []
+                property int currentLocaleIndex: 0
+                property list<string> allVoices: []
+                property int currentVoiceIndex: 0
+
+                Component.onCompleted: {
+                    // some engines initialize asynchronously
+                    if (tts.state == TextToSpeech.Ready) {
+                        engineReady()
+                    } else {
+                        tts.stateChanged.connect(voiceSettingsExpander.engineReady)
+                    }
+
+                    tts.updateStateLabel(tts.state)
+                }
+
+                function engineReady() {
+                    tts.stateChanged.disconnect(voiceSettingsExpander.engineReady)
+                    if (tts.state != TextToSpeech.Ready) {
+                        tts.updateStateLabel(tts.state)
+                        return;
+                    }
+                    updateLocales()
+                    updateVoices()
+                }
+
+                function updateLocales() {
+                    voiceSettingsExpander.allLocales = tts.availableLocales().map((locale) => locale.nativeLanguageName)
+                    voiceSettingsExpander.currentLocaleIndex = allLocales.indexOf(tts.locale.nativeLanguageName)
+                }
+
+                function updateVoices() {
+                    voiceSettingsExpander.allVoices = tts.availableVoices().map((voice) => voice.name)
+                    voiceSettingsExpander.currentVoiceIndex = tts.availableVoices().indexOf(tts.voice)
+                }
+
+                model: [
+                    Component {
+                        RowLayout {
+                            width: voiceSettingsExpander.width
+                            spacing: 8
+                            Label {
+                                text: qsTr("Engine:")
+                                font.pointSize: 16
+                                Layout.alignment: Qt.AlignVCenter
+                                Layout.minimumWidth: voiceSettingsExpander.width * 0.3
+                            }
+                            ComboBox {
+                                id: enginesComboBox
+                                model: tts.availableEngines()
+                                font.pointSize: 16
+                                enabled: tts.state === TextToSpeech.Ready
+                                Component.onCompleted: {
+                                    currentIndex = tts.availableEngines().indexOf(tts.engine)
+                                    tts.engine = textAt(currentIndex)
+                                }
+                                onActivated: {
+                                    tts.engine = textAt(currentIndex)
+                                    voiceSettingsExpander.updateLocales()
+                                    voiceSettingsExpander.updateVoices()
+                                }
+                                Layout.fillWidth: true
+                            }
+                        }
+                    },
+                    Component {
+                        RowLayout {
+                            width: voiceSettingsExpander.width
+                            spacing: 8
+                            Label {
+                                text: qsTr("Locale:")
+                                font.pointSize: 16
+                                Layout.alignment: Qt.AlignVCenter
+                                Layout.minimumWidth: voiceSettingsExpander.width * 0.3
+                            }
+                            ComboBox {
+                                id: localesComboBox
+                                font.pointSize: 16
+                                enabled: tts.state === TextToSpeech.Ready
+                                model: voiceSettingsExpander.allLocales
+                                currentIndex: voiceSettingsExpander.currentLocaleIndex
+                                onActivated: {
+                                    let locales = tts.availableLocales()
+                                    tts.locale = locales[currentIndex]
+                                    voiceSettingsExpander.updateVoices()
+                                }
+                                Layout.fillWidth: true
+                            }
+                        }
+                    },
+                    Component {
+                        RowLayout {
+                            width: voiceSettingsExpander.width
+                            spacing: 8
+                            Label {
+                                text: qsTr("Voice:")
+                                font.pointSize: 16
+                                Layout.alignment: Qt.AlignVCenter
+                                Layout.minimumWidth: voiceSettingsExpander.width * 0.3
+                            }
+                            ComboBox {
+                                id: voicesComboBox
+                                font.pointSize: 16
+                                enabled: tts.state === TextToSpeech.Ready
+                                model: voiceSettingsExpander.allVoices
+                                currentIndex: voiceSettingsExpander.currentVoiceIndex
+                                onActivated: {
+                                    tts.voice = tts.availableVoices()[currentIndex]
+                                }
+                                Layout.fillWidth: true
+                            }
+                        }
+                    },
+                    Component {
+                        RowLayout {
+                            width: voiceSettingsExpander.width
+                            spacing: 8
+                            Label {
+                                text: qsTr("Volume:")
+                                font.pointSize: 16
+                                Layout.alignment: Qt.AlignVCenter
+                                Layout.minimumWidth: voiceSettingsExpander.width * 0.3
+                            }
+                            Slider {
+                                id: volumeSlider
+                                enabled: tts.state === TextToSpeech.Ready
+                                from: 0
+                                to: 1.0
+                                stepSize: 0.2
+                                value: 0.8
+                                font.pointSize: 16
+                                Layout.fillWidth: true
+                                Binding {
+                                    target: tts
+                                    property: "volume"
+                                    value: volumeSlider.value
+                                }
+                            }
+                        }
+                    },
+                    Component {
+                        RowLayout {
+                            width: voiceSettingsExpander.width
+                            spacing: 8
+                            Label {
+                                text: qsTr("Pitch:")
+                                font.pointSize: 16
+                                Layout.alignment: Qt.AlignVCenter
+                                Layout.minimumWidth: voiceSettingsExpander.width * 0.3
+                            }
+                            Slider {
+                                id: pitchSlider
+                                enabled: tts.state === TextToSpeech.Ready
+                                from: -1.0
+                                to: 1.0
+                                stepSize: 0.5
+                                value: 0
+                                font.pointSize: 16
+                                Layout.fillWidth: true
+                                Binding {
+                                    target: tts
+                                    property: "pitch"
+                                    value: pitchSlider.value
+                                }
+                            }
+                        }
+                    },
+                    Component {
+                        RowLayout {
+                            width: voiceSettingsExpander.width
+                            spacing: 8
+                            Label {
+                                text: qsTr("Rate:")
+                                font.pointSize: 16
+                                Layout.alignment: Qt.AlignVCenter
+                                Layout.minimumWidth: voiceSettingsExpander.width * 0.3
+                            }
+                            Slider {
+                                id: rateSlider
+                                enabled: tts.state === TextToSpeech.Ready
+                                from: -1.0
+                                to: 1.0
+                                stepSize: 0.5
+                                value: 0
+                                font.pointSize: 16
+                                Layout.fillWidth: true
+                                Binding {
+                                    target: tts
+                                    property: "rate"
+                                    value: rateSlider.value
+                                }
+                            }
                         }
                     }
                 ]
