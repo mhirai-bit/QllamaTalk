@@ -43,6 +43,8 @@ void VoiceRecognitionEngine::addAudio(const std::vector<float> & pcms)
 {
     // 単純に追加
     m_buffer.insert(m_buffer.end(), pcms.begin(), pcms.end());
+    qDebug() << "[VoiceRecognitionEngine] addAudio() => added"
+             << pcms.size() << "samples. total buffer size =" << m_buffer.size();
 }
 
 void VoiceRecognitionEngine::start()
@@ -81,12 +83,15 @@ void VoiceRecognitionEngine::stop()
 void VoiceRecognitionEngine::processVadCheck()
 {
     if (!m_running) return;
+    qDebug() << "[VoiceRecognitionEngine] processVadCheck. buffer size =" << m_buffer.size();
+
     if (m_buffer.size() < 16000 * 2) {
         // 2秒分ないとVADチェックできない (例)
         return;
     }
     auto t_now = std::chrono::steady_clock::now();
     auto t_diff = std::chrono::duration_cast<std::chrono::milliseconds>(t_now - m_t_last).count();
+    qDebug() << "[VoiceRecognitionEngine] t_diff =" << t_diff << "ms since last check";
     if (t_diff < 2000) {
         return;
     }
@@ -102,6 +107,7 @@ void VoiceRecognitionEngine::processVadCheck()
     // 簡易VAD
     if (!vad_simple(pcmf32_new, COMMON_SAMPLE_RATE, 1000,
                     m_params.vad_thold, m_params.freq_thold, false)) {
+        qDebug() << "[VoiceRecognitionEngine] VAD => no speech detected.";
         // 無音
         return;
     }
@@ -117,6 +123,7 @@ void VoiceRecognitionEngine::processVadCheck()
     std::vector<float> pcmf32(n_len);
     memcpy(pcmf32.data(), &m_buffer[m_buffer.size() - n_len], n_len*sizeof(float));
 
+    qDebug() << "[VoiceRecognitionEngine] VAD => speech detected. Running whisper...";
     runWhisper(pcmf32);
 }
 

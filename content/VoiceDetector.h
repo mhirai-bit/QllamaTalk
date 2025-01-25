@@ -11,10 +11,10 @@
 #include <vector>
 
 /*
- * VoiceDetector:
- *   - QAudioSourceを使ってマイク入力を取得
+ * VoiceDetector (pull mode):
+ *   - 独自の QIODevice を用いて pull モードでマイク入力を取得
  *   - リングバッファに一定長のサンプルを保持 (m_len_ms分)
- *   - 新規に読み込んだサンプルは audioAvailable(std::vector<float>) シグナルでも通知
+ *   - 新規に読み取ったサンプルは audioAvailable(...) シグナルでも通知
  *
  * 使用例:
  *   VoiceDetector * detector = new VoiceDetector(10000); // 10秒分バッファ
@@ -24,6 +24,9 @@
  *   // シグナル: void audioAvailable(std::vector<float> chunk)
  *   //  これを接続して、音声エンジンに chunk を渡すなど
  */
+
+// 前方宣言
+class VoicePullIODevice;
 
 class VoiceDetector : public QObject
 {
@@ -43,13 +46,9 @@ public:
     void get(int ms, std::vector<float> & result);
 
 signals:
-    // 新たに読み取ったサンプルを通知
-    // chunk.size() はマイクから今回 read() できたサンプル数
+    // pull デバイスから読み取ったサンプルを通知
+    // chunk.size() は今回受け取ったサンプル数
     void audioAvailable(const std::vector<float> & chunk);
-
-private slots:
-    // QIODevice::readyReadがシグナルされたときに呼び出し
-    void onDataAvailable();
 
 private:
     // リングバッファ関連
@@ -64,10 +63,12 @@ private:
     int  m_sample_rate = 0;
 
     // Qt Multimedia
-    QAudioSource  *m_audioSource  = nullptr;
-    QIODevice     *m_audioDevice  = nullptr; // audioSource->start() で得られるIOデバイス
+    QAudioSource   *m_audioSource   = nullptr;
+    VoicePullIODevice *m_pullDevice = nullptr; // pullモード用のカスタムQIODevice
 
     bool m_initialized = false;
+
+    friend class VoicePullIODevice; // pullデバイスからリングバッファ操作できるように
 };
 
 #endif // VOICEDETECTOR_H

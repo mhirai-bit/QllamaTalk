@@ -1,10 +1,91 @@
 #include "VoiceDetector.h"
 
+#include <QMediaDevices>
 #include <QAudioFormat>
 #include <QDebug>
 #include <QThread>
 #include <algorithm>
 #include <cstring> // memcpy
+
+//-------------------------
+// Pullモード用のカスタム QIODevice 実装
+//-------------------------
+class VoicePullIODevice : public QIODevice
+{
+public:
+    explicit VoicePullIODevice(VoiceDetector *detector, QObject *parent = nullptr)
+        : QIODevice(parent)
+        , m_detector(detector)
+    {
+    }
+
+    bool open(OpenMode mode) override {
+        // Pullモード時は writeOnly であればOK
+        return QIODevice::open(mode);
+    }
+
+    // QIODevice interface
+    qint64 readData(char * /*data*/, qint64 /*maxSize*/) override {
+        // pullモードでは読み取りはしないので、常に0を返す
+        return 0;
+    }
+    qint64 writeData(const char *data, qint64 len) override {
+        // ここでオーディオデータを受け取る
+        // もし VoiceDetector が停止中ならすぐ返す
+        if (!m_detector->m_running.load()) {
+            return len; // 受け取るだけ受け取って破棄
+        }
+
+        // データを float として解釈
+        //   preferredFormat() が Int16 などの場合は自前で変換が必要 (省略)
+        //   ここでは Float前提で進める例に
+        size_t n_samples = static_cast<size_t>(len / sizeof(float));
+        const float *samples = reinterpret_cast<const float*>(data);
+
+        // 1) シグナル発行用のベクタを確保
+        std::vector<float> chunkVec(n_samples);
+        for (size_t i = 0; i < n_samples; i++) {
+            chunkVec[i] = samples[i];
+        }
+
+        // 2) シグナル送信
+        emit m_detector->audioAvailable(chunkVec);
+
+        // 3) リングバッファに格納
+        QMutexLocker locker(&m_detector->m_mutex);
+
+        if (n_samples > m_detector->m_audio.size()) {
+            // 入りきらない場合は最後の分だけ
+            size_t discard = n_samples - m_detector->m_audio.size();
+            samples += discard;
+            n_samples = m_detector->m_audio.size();
+        }
+
+        size_t pos = m_detector->m_audio_pos;
+        size_t bufSize = m_detector->m_audio.size();
+
+        if (pos + n_samples > bufSize) {
+            const size_t n0 = bufSize - pos;
+            std::memcpy(&m_detector->m_audio[pos], samples, n0 * sizeof(float));
+            std::memcpy(&m_detector->m_audio[0], samples + n0, (n_samples - n0) * sizeof(float));
+            m_detector->m_audio_pos = (pos + n_samples) % bufSize;
+            m_detector->m_audio_len = bufSize; // バッファ満杯
+        } else {
+            std::memcpy(&m_detector->m_audio[pos], samples, n_samples * sizeof(float));
+            m_detector->m_audio_pos = (pos + n_samples) % bufSize;
+            m_detector->m_audio_len = std::min(m_detector->m_audio_len + n_samples, bufSize);
+        }
+
+        return len;
+    }
+
+private:
+    VoiceDetector *m_detector = nullptr;
+};
+
+//-------------------------
+// VoiceDetector 実装
+//-------------------------
 
 VoiceDetector::VoiceDetector(int len_ms, QObject *parent)
     : QObject(parent)
@@ -21,6 +102,11 @@ VoiceDetector::~VoiceDetector()
         delete m_audioSource;
         m_audioSource = nullptr;
     }
+    // pull用のIODeviceも削除
+    if (m_pullDevice) {
+        delete m_pullDevice;
+        m_pullDevice = nullptr;
+    }
 }
 
 bool VoiceDetector::init(int sampleRate, int channelCount)
@@ -33,44 +119,57 @@ bool VoiceDetector::init(int sampleRate, int channelCount)
     m_sample_rate = sampleRate;
 
     // リングバッファのサイズを確保 (サンプルレート * len_ms / 1000)
-    size_t bufferSize = static_cast<size_t>(m_sample_rate) * m_len_ms / 1000 * channelCount;
+    const size_t bufferSize = static_cast<size_t>(m_sample_rate) * m_len_ms / 1000 * channelCount;
     m_audio.resize(bufferSize, 0.0f);
     m_audio_pos = 0;
     m_audio_len = 0;
 
     // QAudioFormat 設定
+    QAudioDevice device = QMediaDevices::defaultAudioInput();
     QAudioFormat format;
-    format.setSampleRate(m_sample_rate);
-    format.setChannelCount(channelCount);
+    // 例: まずは device.preferredFormat() を使う。あるいは明示的に Int16 でやる等
+    format = device.preferredFormat();
+    // ここでログを出す
+    qDebug() << "[VoiceDetector] device.preferredFormat ="
+             << format.sampleRate() << format.channelCount() << format.sampleFormat();
 
-    // Qt6以降なら setSampleFormat(QAudioFormat::Float) が使える
-    // ただし環境によってはFloat未対応で fallback する可能性あり
-    format.setSampleFormat(QAudioFormat::Float);
+    // (必要があれば format.setSampleRate(sampleRate), setChannelCount(channelCount) 等)
+    // format.setSampleRate(m_sample_rate);
+    // format.setChannelCount(channelCount);
+    // format.setSampleFormat(QAudioFormat::Float);
 
     // QAudioSourceの作成
-    m_audioSource = new QAudioSource(format, this);
+    m_audioSource = new QAudioSource(device, format, this);
     if (!m_audioSource) {
         qWarning() << "[VoiceDetector] Failed to create QAudioSource";
         return false;
     }
 
-    // QAudioSource のデバイス(読み取り用)を取得
-    m_audioDevice = m_audioSource->start();
-    if (!m_audioDevice) {
-        qWarning() << "[VoiceDetector] Failed to start QAudioSource";
+    // pullモード用の QIODevice を作成
+    m_pullDevice = new VoicePullIODevice(this, this);
+    if (!m_pullDevice->open(QIODevice::WriteOnly)) {
+        qWarning() << "[VoiceDetector] Failed to open pullDevice";
+        delete m_pullDevice;
+        m_pullDevice = nullptr;
         delete m_audioSource;
         m_audioSource = nullptr;
         return false;
     }
 
-    // readyRead() シグナルに接続
-    connect(m_audioDevice, &QIODevice::readyRead,
-            this, &VoiceDetector::onDataAvailable);
+    // QAudioSource を start() するが、第1引数に "pullモード用のIOデバイス" を渡す
+    m_audioSource->start(m_pullDevice);
+
+    // ここで state が変わるか確認 (デバッグ用)
+    connect(m_audioSource, &QAudioSource::stateChanged,
+            this, [this](QAudio::State newState){
+                qDebug() << "[VoiceDetector] stateChanged ->" << newState
+                         << "error=" << m_audioSource->error();
+            });
 
     m_initialized = true;
-    qDebug() << "[VoiceDetector] init done. sampleRate=" << m_sample_rate
-             << ", channelCount=" << channelCount
-             << ", bufferSize=" << bufferSize;
+    qDebug() << "[VoiceDetector] init done. bufferSize =" << bufferSize
+             << "m_audioSource state =" << m_audioSource->state();
+
     return true;
 }
 
@@ -89,7 +188,7 @@ bool VoiceDetector::resume()
     m_audioSource->resume();
     m_running.store(true);
 
-    qDebug() << "[VoiceDetector] resume capturing";
+    qDebug() << "[VoiceDetector] resume capturing. state =" << m_audioSource->state();
     return true;
 }
 
@@ -108,7 +207,7 @@ bool VoiceDetector::pause()
     m_audioSource->suspend();
     m_running.store(false);
 
-    qDebug() << "[VoiceDetector] pause capturing";
+    qDebug() << "[VoiceDetector] pause capturing. state =" << m_audioSource->state();
     return true;
 }
 
@@ -129,62 +228,6 @@ bool VoiceDetector::clear()
     std::fill(m_audio.begin(), m_audio.end(), 0.0f);
     qDebug() << "[VoiceDetector] buffer cleared";
     return true;
-}
-
-void VoiceDetector::onDataAvailable()
-{
-    if (!m_running.load()) {
-        // 動作していないならバッファを読み捨て
-        m_audioDevice->readAll();
-        return;
-    }
-
-    const qint64 bytesAvail = m_audioDevice->bytesAvailable();
-    if (bytesAvail <= 0) {
-        return;
-    }
-
-    // まとめて読み込む
-    QByteArray ba = m_audioDevice->readAll();
-    qint64 len = ba.size();
-    if (len == 0) {
-        return;
-    }
-
-    // Floatサンプルとして解釈
-    size_t n_samples = static_cast<size_t>(len / sizeof(float));
-    const float *samples = reinterpret_cast<const float*>(ba.constData());
-
-    // ここで "新たに読み取った chunk" をシグナルで emit したい場合:
-    {
-        std::vector<float> chunkVec(n_samples);
-        for (size_t i = 0; i < n_samples; i++) {
-            chunkVec[i] = samples[i];
-        }
-        emit audioAvailable(chunkVec);
-    }
-
-    // --- リングバッファへ保存 ---
-    QMutexLocker locker(&m_mutex);
-
-    if (n_samples > m_audio.size()) {
-        // 入りきらない場合は最後の分だけ
-        size_t discard = n_samples - m_audio.size();
-        samples += discard;
-        n_samples = m_audio.size();
-    }
-
-    if (m_audio_pos + n_samples > m_audio.size()) {
-        const size_t n0 = m_audio.size() - m_audio_pos;
-        std::memcpy(&m_audio[m_audio_pos], samples, n0 * sizeof(float));
-        std::memcpy(&m_audio[0], samples + n0, (n_samples - n0) * sizeof(float));
-        m_audio_pos = (m_audio_pos + n_samples) % m_audio.size();
-        m_audio_len = m_audio.size(); // バッファ満杯
-    } else {
-        std::memcpy(&m_audio[m_audio_pos], samples, n_samples * sizeof(float));
-        m_audio_pos = (m_audio_pos + n_samples) % m_audio.size();
-        m_audio_len = std::min(m_audio_len + n_samples, m_audio.size());
-    }
 }
 
 void VoiceDetector::get(int ms, std::vector<float> & result)
