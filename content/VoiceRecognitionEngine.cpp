@@ -79,6 +79,18 @@ void VoiceRecognitionEngine::stop()
     qDebug() << "[VoiceRecognitionEngine] stop() done.";
 }
 
+void VoiceRecognitionEngine::setLanguage(const QString &language) {
+    std::string langStd = language.toStdString();
+    // チェック
+    int langId = whisper_lang_id(langStd.c_str());
+    if (langId < 0) {
+        qWarning() << "Invalid whisper language code:" << language;
+        return; // or fallback
+    }
+
+    m_whisper_params.language = langStd; // 有効なのでセット
+}
+
 void VoiceRecognitionEngine::processVadCheck()
 {
     if (!m_running) return;

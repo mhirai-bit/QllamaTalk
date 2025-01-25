@@ -124,6 +124,7 @@ public:
     Q_INVOKABLE void switchEngineMode(EngineMode mode);
     Q_INVOKABLE void pauseVoiceDetection();
     Q_INVOKABLE void resumeVoiceDetection();
+    Q_INVOKABLE void setVoiceRecognitionLanguage(const QString &language);
 
     //--------------------------------------------------------------------------
     // QML-Exposed Getters / Setters (QMLに公開されるゲッター/セッター)

@@ -40,6 +40,8 @@ public:
 
     bool isRunning() const { return m_running; }
 
+    void setLanguage(const QString & language);
+
 signals:
     // 音声が認識されテキストが確定したらemit
     void textRecognized(const QString & text);

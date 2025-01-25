@@ -440,6 +440,11 @@ void LlamaChatEngine::resumeVoiceDetection()
     m_voiceDetector->resume();
 }
 
+void LlamaChatEngine::setVoiceRecognitionLanguage(const QString &language)
+{
+    m_voiceRecognitionEngine->setLanguage(language);
+}
+
 //------------------------------------------------------------------------------
 // onPartialResponse
 // 部分的なテキストをUIに反映
