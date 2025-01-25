@@ -42,11 +42,11 @@ ApplicationWindow {
 
         onButtonClicked: function(button, role){
             switch(button) {
-                case MessageDialog.Yes:
-                    LlamaChatEngine.switchEngineMode(LlamaChatEngine.Mode_Local)
-                    break
-                case MessageDialog.No:
-                    break
+            case MessageDialog.Yes:
+                LlamaChatEngine.switchEngineMode(LlamaChatEngine.Mode_Local)
+                break
+            case MessageDialog.No:
+                break
             }
         }
     }
@@ -61,12 +61,12 @@ ApplicationWindow {
 
         onButtonClicked: function(button, role){
             switch(button) {
-                case MessageDialog.Yes:
-                    modeCombo.currentIndex = 1
-                    settingsDrawer.open()
-                    break
-                case MessageDialog.No:
-                    break
+            case MessageDialog.Yes:
+                modeCombo.currentIndex = 1
+                settingsDrawer.open()
+                break
+            case MessageDialog.No:
+                break
             }
         }
     }
@@ -94,8 +94,8 @@ ApplicationWindow {
                 id: connectionStatusLabel
                 // isRemote なら ipAddress:portNumber を表示
                 text: mainWindow.isRemote
-                    ? qsTr("Remote") + " " + LlamaChatEngine.ipAddress + ":" + LlamaChatEngine.portNumber
-                    : qsTr("Local")
+                      ? qsTr("Remote") + " " + LlamaChatEngine.ipAddress + ":" + LlamaChatEngine.portNumber
+                      : qsTr("Local")
                 anchors.verticalCenter: headerRow.verticalCenter
                 font.pointSize: 14
             }
@@ -241,6 +241,48 @@ ApplicationWindow {
                     settingsDrawer.close()
                 }
                 font.pointSize: 16
+            }
+
+            Expander {
+                title: "Test Settings"
+                model: [
+                    Component {
+                        RowLayout {
+                            spacing: 8
+                            Label {
+                                text: qsTr("Test Setting 1")
+                            }
+                            TextField {
+                                placeholderText: qsTr("Enter setting 1")
+                                Layout.alignment: Qt.AlignRight
+                            }
+                        }
+                    },
+                    Component {
+                        RowLayout {
+                            spacing: 8
+                            Label {
+                                text: qsTr("Test Setting 2")
+                            }
+                            TextField {
+                                placeholderText: qsTr("Enter setting 2")
+                                Layout.alignment: Qt.AlignRight
+                            }
+                        }
+                    },
+                    Component {
+                        RowLayout {
+                            spacing: 8
+                            Label {
+                                text: qsTr("Test Setting 3")
+                            }
+                            TextField {
+                                placeholderText: qsTr("Enter setting 3")
+                                Layout.alignment: Qt.AlignRight
+                            }
+                        }
+                    }
+                ]
             }
         }
     }

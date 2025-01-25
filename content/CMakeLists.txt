@@ -248,12 +248,14 @@ qt6_add_qml_module(content
         Screen01.ui.qml
         ChatView.qml
         ChatInputField.qml
+        Expander.qml
     RESOURCES
         fonts/fonts.txt
         icons/online.svg
         icons/offline.svg
         icons/local_error.svg
         icons/remote_error.svg
+        icons/arrow.svg
     SOURCES
         ChatMessageModel.cpp
         ChatMessageModel.h

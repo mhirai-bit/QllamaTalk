@@ -49,7 +49,7 @@ int main(int argc, char ** argv) {
     qDebug() << "style:" << QQuickStyle::name();
 
     // リソースパスをすべてプリントアウト
-    printAllResourcePaths();
+    // printAllResourcePaths();
 
     QQmlApplicationEngine engine;
     const QUrl url(u"qrc:/qt/qml/Main/main.qml"_qs);
