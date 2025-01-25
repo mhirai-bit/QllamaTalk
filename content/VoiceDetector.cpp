@@ -1,6 +1,5 @@
 #include "VoiceDetector.h"
 
-#include <QCoreApplication>
 #include <QMediaDevices>
 #include <QAudioFormat>
 #include <QDebug>
@@ -30,7 +29,6 @@ public:
         return 0;
     }
     qint64 writeData(const char *data, qint64 data_len_in_bytes) override {
-        qDebug() << "writeData() thread =" << QThread::currentThread();
         // ここでオーディオデータを受け取る
         // もし VoiceDetector が停止中ならすぐ返す
         if (!m_voice_detector->m_running) {
@@ -113,8 +111,7 @@ bool VoiceDetector::init(int sampleRate, int channelCount)
         qCritical() << "[VoiceDetector] Error: Float format is NOT supported by the device!"
                     << "sampleRate=" << m_sample_rate
                     << "ch=" << channelCount;
-        QCoreApplication::exit(1);
-        return false; // (到達しないかもしれませんが念のため)
+        return false;
     }
 
     // 4) QAudioSourceの生成（pullモード前提）

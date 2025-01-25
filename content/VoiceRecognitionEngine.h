@@ -10,7 +10,7 @@ struct whisper_context;
 
 // 簡易パラメータ
 struct VoiceRecParams {
-    int   length_ms  = 10000;  // 10秒
+    int   length_for_inference_ms  = 10000;  // 10秒
     float vad_thold  = 0.6f;
     float freq_thold = 100.0f;
 
@@ -51,16 +51,13 @@ private:
     void runWhisper(const std::vector<float> & pcmf32);
 
     struct whisper_context * m_ctx = nullptr;
-    VoiceRecParams  m_params;
+    VoiceRecParams  m_whisper_params;
 
     // 音声保存用
     std::vector<float> m_capturedAudio;
 
     QTimer * m_timer = nullptr;
     bool     m_running = false;
-
-    // 2秒に1回程度 VADチェックするためのタイムスタンプ
-    std::chrono::time_point<std::chrono::steady_clock> m_t_last;
 };
 
 #endif // VOICERECOGNITIONENGINE_H

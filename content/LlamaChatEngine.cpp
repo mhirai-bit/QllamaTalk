@@ -13,6 +13,7 @@
 #include <QTimer>
 #include "LlamaResponseGenerator.h"
 #include "rep_LlamaResponseGenerator_replica.h"
+#include "common.h"
 
 //------------------------------------------------------------------------------
 // Static: Default LLaMA model path
@@ -645,7 +646,7 @@ void LlamaChatEngine::initVoiceRecognition()
     VoiceRecParams vrParams;
     vrParams.language = "en";
     vrParams.model    = WHISPER_MODEL_NAME;
-    vrParams.length_ms  = 10000;  // 10秒取りたい
+    vrParams.length_for_inference_ms  = 10000;  // 10秒取りたい
     vrParams.vad_thold  = 0.6f;
     vrParams.freq_thold = 100.0f;
     // ... GPU設定など
@@ -661,12 +662,12 @@ void LlamaChatEngine::initVoiceRecognition()
             this, &LlamaChatEngine::handleRecognizedText);
 
     if (!m_voiceDetector) {
-        m_voiceDetector = new VoiceDetector(vrParams.length_ms, this);
+        m_voiceDetector = new VoiceDetector(vrParams.length_for_inference_ms, this);
         // VoiceDetectorが音声を取得したら voiceEngine->addAudio(...) へ渡す
         connect(m_voiceDetector, &VoiceDetector::audioAvailable,
                 m_voiceRecognitionEngine, &VoiceRecognitionEngine::addAudio);
         // VoiceDetectorの初期化 (例: init(16kHz), start capturing, etc.)
-        m_voiceDetector->init(/*sampleRate=*/16000, /*channelCount=*/1);
+        m_voiceDetector->init(/*sampleRate=*/COMMON_SAMPLE_RATE, /*channelCount=*/1);
     }
 }
 
