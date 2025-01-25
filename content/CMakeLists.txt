@@ -1,5 +1,5 @@
 qt_add_library(content STATIC)
-find_package(Qt6 REQUIRED COMPONENTS Concurrent RemoteObjects WebSockets Multimedia)
+find_package(Qt6 REQUIRED COMPONENTS Concurrent RemoteObjects WebSockets Multimedia TextToSpeech)
 
 qt6_add_repc_replicas(content
     ../LLMRemoteServer/QtRemoteObjectsFiles/LlamaResponseGenerator.rep

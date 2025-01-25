@@ -253,6 +253,10 @@ void LlamaChatEngine::teardownLocalConnections()
         disconnect(*mLocalGenerationFinishedConnection);
         mLocalGenerationFinishedConnection.reset();
     }
+    if (mLocalGenerationFinishedToQMLConnection.has_value()) {
+        disconnect(*mLocalGenerationFinishedToQMLConnection);
+        mLocalGenerationFinishedToQMLConnection.reset();
+    }
     if (mLocalGenerationErrorConnection.has_value()) {
         disconnect(*mLocalGenerationErrorConnection);
         mLocalGenerationErrorConnection.reset();
@@ -286,6 +290,11 @@ void LlamaChatEngine::setupLocalConnections()
     mLocalGenerationFinishedConnection = connect(
         mLocalGenerator, &LlamaResponseGenerator::generationFinished,
         this, &LlamaChatEngine::onGenerationFinished
+        );
+
+    mLocalGenerationFinishedToQMLConnection = connect(
+        mLocalGenerator, &LlamaResponseGenerator::generationFinished,
+        this, &LlamaChatEngine::generationFinishedToQML
         );
 
     mLocalGenerationErrorConnection = connect(
@@ -326,6 +335,10 @@ void LlamaChatEngine::teardownRemoteConnections()
         disconnect(*mRemoteGenerationFinishedConnection);
         mRemoteGenerationFinishedConnection.reset();
     }
+    if (mRemoteGenerationFinishedToQMLConnection.has_value()) {
+        disconnect(*mRemoteGenerationFinishedToQMLConnection);
+        mRemoteGenerationFinishedToQMLConnection.reset();
+    }
     if (mRemoteGenerationErrorConnection.has_value()) {
         disconnect(*mRemoteGenerationErrorConnection);
         mRemoteGenerationErrorConnection.reset();
@@ -355,6 +368,11 @@ void LlamaChatEngine::setupRemoteConnections()
     mRemoteGenerationFinishedConnection = connect(
         &mRemoteGenerator, &RemoteResponseGeneratorCompositor::generationFinished,
         this, &LlamaChatEngine::onGenerationFinished
+        );
+
+    mRemoteGenerationFinishedToQMLConnection = connect(
+        &mRemoteGenerator, &RemoteResponseGeneratorCompositor::generationFinished,
+        this, &LlamaChatEngine::generationFinishedToQML
         );
 
     mRemoteGenerationErrorConnection = connect(
@@ -410,6 +428,16 @@ void LlamaChatEngine::switchEngineMode(EngineMode newMode)
         return;
     }
     doImmediateEngineSwitch(newMode);
+}
+
+void LlamaChatEngine::pauseVoiceDetection()
+{
+    m_voiceDetector->pause();
+}
+
+void LlamaChatEngine::resumeVoiceDetection()
+{
+    m_voiceDetector->resume();
 }
 
 //------------------------------------------------------------------------------

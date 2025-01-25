@@ -122,6 +122,8 @@ public:
     // QML-Invokable Methods (QMLから呼び出せるpublicメソッド)
     //--------------------------------------------------------------------------
     Q_INVOKABLE void switchEngineMode(EngineMode mode);
+    Q_INVOKABLE void pauseVoiceDetection();
+    Q_INVOKABLE void resumeVoiceDetection();
 
     //--------------------------------------------------------------------------
     // QML-Exposed Getters / Setters (QMLに公開されるゲッター/セッター)
@@ -173,6 +175,7 @@ signals:
     //--------------------------------------------------------------------------
     void userInputChanged();
     void requestGeneration(const QList<LlamaChatMessage>& messages);
+    void generationFinishedToQML(const QString& finalResponse);
     void currentEngineModeChanged();
     void ipAddressChanged();
     void portNumberChanged();
@@ -289,6 +292,7 @@ private:
     std::optional<QMetaObject::Connection> mRemoteRequestGenerationConnection;
     std::optional<QMetaObject::Connection> mRemotePartialResponseConnection;
     std::optional<QMetaObject::Connection> mRemoteGenerationFinishedConnection;
+    std::optional<QMetaObject::Connection> mRemoteGenerationFinishedToQMLConnection;
     std::optional<QMetaObject::Connection> mRemoteGenerationErrorConnection;
     std::optional<QMetaObject::Connection> mRemoteGenerationErrorToQmlConnection;
 
@@ -296,6 +300,7 @@ private:
     std::optional<QMetaObject::Connection> mLocalRequestGenerationConnection;
     std::optional<QMetaObject::Connection> mLocalPartialResponseConnection;
     std::optional<QMetaObject::Connection> mLocalGenerationFinishedConnection;
+    std::optional<QMetaObject::Connection> mLocalGenerationFinishedToQMLConnection;
     std::optional<QMetaObject::Connection> mLocalGenerationErrorConnection;
     std::optional<QMetaObject::Connection> mLocalGenerationErrorToQmlConnection;
 

@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import QtQuick.VectorImage
 import QtQuick.Controls
 import QtQuick.Dialogs
+import QtTextToSpeech
 
 import QllamaTalk
 import content
@@ -130,6 +131,34 @@ ApplicationWindow {
     ChatView {
         id: mainScreen
         anchors.fill: parent
+    }
+
+    TextToSpeech {
+        id: tts
+        // TODO: GUIから色々設定変更できるようにする
+        volume: 10
+
+        onStateChanged: {
+            switch (state) {
+            case TextToSpeech.Ready:
+                LlamaChatEngine.resumeVoiceDetection()
+                break
+            case TextToSpeech.Speaking:
+                break
+            case TextToSpeech.Paused:
+                break
+            case TextToSpeech.Error:
+                break
+            }
+        }
+    }
+    Connections {
+        target: LlamaChatEngine
+        function onGenerationFinishedToQML(text) {
+            // 自分が読み上げたテキストを検知してしまわないように、voice detectionを一時的に止める
+            LlamaChatEngine.pauseVoiceDetection()
+            tts.say(text)
+        }
     }
 
     // Drawer
