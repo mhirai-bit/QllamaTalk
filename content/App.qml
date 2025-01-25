@@ -173,113 +173,91 @@ ApplicationWindow {
             spacing: 16
             padding: 20
 
-            Label {
-                id: connectionSettingText
-                text: qsTr("Connection Settings")
-                font.bold: true
-                font.pointSize: 24
-            }
-
-            Row {
-                id: engineModeRow
-                spacing: 8
-                Label {
-                    id: modeLabel
-                    text: qsTr("Engine Mode:")
-                    anchors.verticalCenter: modeCombo.verticalCenter
-                    font.pointSize: 16
-                }
-                ComboBox {
-                    id: modeCombo
-                    width: modeLabel.width * 1.5
-                    model: [qsTr("Local"), qsTr("Remote")]
-                    currentIndex: mainWindow.isRemote ? 1 : 0
-                    font.pointSize: 16
-                }
-            }
-
-            // IP入力フィールド (regularExpressionValidatorの例)
-            TextField {
-                id: ipField
-                width: engineModeRow.width
-                placeholderText: qsTr("Enter server IP (e.g. 192.168.0.220)")
-                enabled: modeCombo.currentIndex === 1
-                validator: RegularExpressionValidator {
-                    // IPv4用の簡易的な正規表現例 (完全には厳密ではありません)
-                    // 0~255の範囲もすべてはカバーできないシンプル例
-                    regularExpression: /^(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)$/
-                }
-                font.pointSize: 16
-            }
-
-            // ポート入力フィールド (IntValidatorで範囲チェック)
-            TextField {
-                id: portField
-                width: engineModeRow.width
-                placeholderText: qsTr("Enter port (1-65535)")
-                enabled: modeCombo.currentIndex === 1
-                validator: IntValidator {
-                    bottom: 1
-                    top: 65535
-                }
-                font.pointSize: 16
-            }
-
-            Button {
-                text: qsTr("Apply")
-                onClicked: {
-                    if (modeCombo.currentIndex === 0) {
-                        // Local
-                        LlamaChatEngine.switchEngineMode(LlamaChatEngine.Mode_Local)
-                        settingsDrawer.close()
-                        return
-                    }
-
-                    LlamaChatEngine.ipAddress = ipField.text
-                    LlamaChatEngine.portNumber = portField.text
-                    LlamaChatEngine.switchEngineMode(LlamaChatEngine.Mode_Remote)
-                    settingsDrawer.close()
-                }
-                font.pointSize: 16
-            }
-
             Expander {
-                title: "Test Settings"
+                id: connectionSettingsExpander
+                title: qsTr("Connection Settings")
+                property int modeComboCurrentIndex: 0
+                property int engineModeRowWidth
+                property string inputIpAddress: ""
+                property int portNumber: 0
                 model: [
                     Component {
                         RowLayout {
+                            id: engineModeRowLayout
                             spacing: 8
                             Label {
-                                text: qsTr("Test Setting 1")
+                                id: modeLabel
+                                text: qsTr("Engine Mode:")
+                                font.pointSize: 16
+                                Layout.alignment: Qt.AlignVCenter
                             }
-                            TextField {
-                                placeholderText: qsTr("Enter setting 1")
-                                Layout.alignment: Qt.AlignRight
+                            ComboBox {
+                                id: modeCombo
+                                width: modeLabel.width * 1.5
+                                model: [qsTr("Local"), qsTr("Remote")]
+                                currentIndex: mainWindow.isRemote ? 1 : 0
+                                font.pointSize: 16
+                                onCurrentIndexChanged: {
+                                    connectionSettingsExpander.modeComboCurrentIndex = modeCombo.currentIndex
+                                }
+                            }
+                            Component.onCompleted: {
+                                connectionSettingsExpander.engineModeRowWidth = width
                             }
                         }
                     },
                     Component {
-                        RowLayout {
-                            spacing: 8
-                            Label {
-                                text: qsTr("Test Setting 2")
+                        // IP入力フィールド (regularExpressionValidatorの例)
+                        TextField {
+                            id: ipField
+                            width: connectionSettingsExpander.engineModeRowWidth
+                            placeholderText: qsTr("Enter server IP (e.g. 192.168.0.220)")
+                            enabled: connectionSettingsExpander.modeComboCurrentIndex === 1
+                            validator: RegularExpressionValidator {
+                                // IPv4用の簡易的な正規表現例 (完全には厳密ではありません)
+                                // 0~255の範囲もすべてはカバーできないシンプル例
+                                regularExpression: /^(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)$/
                             }
-                            TextField {
-                                placeholderText: qsTr("Enter setting 2")
-                                Layout.alignment: Qt.AlignRight
+                            font.pointSize: 16
+                            onTextChanged: {
+                                connectionSettingsExpander.inputIpAddress = ipField.text
                             }
                         }
                     },
                     Component {
-                        RowLayout {
-                            spacing: 8
-                            Label {
-                                text: qsTr("Test Setting 3")
+                        // ポート入力フィールド (IntValidatorで範囲チェック)
+                        TextField {
+                            id: portField
+                            width: connectionSettingsExpander.engineModeRowWidth
+                            placeholderText: qsTr("Enter port (1-65535)")
+                            enabled: connectionSettingsExpander.modeComboCurrentIndex === 1
+                            validator: IntValidator {
+                                bottom: 1
+                                top: 65535
                             }
-                            TextField {
-                                placeholderText: qsTr("Enter setting 3")
-                                Layout.alignment: Qt.AlignRight
+                            font.pointSize: 16
+                            onTextChanged: {
+                                connectionSettingsExpander.portNumber = portField.text
                             }
+                        }
+                    },
+                    Component {
+                        Button {
+                            text: qsTr("Apply")
+                            onClicked: {
+                                if (connectionSettingsExpander.modeComboCurrentIndex === 0) {
+                                    // Local
+                                    LlamaChatEngine.switchEngineMode(LlamaChatEngine.Mode_Local)
+                                    settingsDrawer.close()
+                                    return
+                                }
+
+                                LlamaChatEngine.ipAddress = connectionSettingsExpander.inputIpAddress
+                                LlamaChatEngine.portNumber = connectionSettingsExpander.portNumber
+                                LlamaChatEngine.switchEngineMode(LlamaChatEngine.Mode_Remote)
+                                settingsDrawer.close()
+                            }
+                            font.pointSize: 16
                         }
                     }
                 ]
