@@ -299,7 +299,7 @@ private:
     std::optional<QMetaObject::Connection> mLocalGenerationErrorConnection;
     std::optional<QMetaObject::Connection> mLocalGenerationErrorToQmlConnection;
 
-    VoiceRecognitionEngine* m_voiceEngine = nullptr;
+    VoiceRecognitionEngine* m_voiceRecognitionEngine = nullptr;
     VoiceDetector*          m_voiceDetector = nullptr;
 
     // Additional helper connection setup/teardown
