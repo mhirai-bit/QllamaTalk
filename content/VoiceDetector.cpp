@@ -33,7 +33,7 @@ public:
         qDebug() << "writeData() thread =" << QThread::currentThread();
         // ここでオーディオデータを受け取る
         // もし VoiceDetector が停止中ならすぐ返す
-        if (!m_voice_detector->m_running.load()) {
+        if (!m_voice_detector->m_running) {
             return data_len_in_bytes; // 受け取るだけ受け取って破棄
         }
 
@@ -67,7 +67,7 @@ VoiceDetector::VoiceDetector(int len_ms, QObject *parent)
     : QObject(parent)
     , m_len_ms(len_ms)
 {
-    m_running.store(false);
+    m_running = false;
 }
 
 VoiceDetector::~VoiceDetector()
@@ -157,14 +157,14 @@ bool VoiceDetector::resume()
         qWarning() << "[VoiceDetector] not initialized";
         return false;
     }
-    if (m_running.load()) {
+    if (m_running) {
         qWarning() << "[VoiceDetector] already running";
         return false;
     }
 
     // QAudioSourceを再開
     m_audioSource->resume();
-    m_running.store(true);
+    m_running = true;
 
     qDebug() << "[VoiceDetector] resume capturing. state =" << m_audioSource->state();
     return true;
@@ -176,14 +176,14 @@ bool VoiceDetector::pause()
         qWarning() << "[VoiceDetector] not initialized";
         return false;
     }
-    if (!m_running.load()) {
+    if (!m_running) {
         qWarning() << "[VoiceDetector] already paused";
         return false;
     }
 
     // 一時停止
     m_audioSource->suspend();
-    m_running.store(false);
+    m_running = false;
 
     qDebug() << "[VoiceDetector] pause capturing. state =" << m_audioSource->state();
     return true;

@@ -46,7 +46,7 @@ signals:
     void audioAvailable(const std::vector<float> & chunk);
 
 private:
-    std::atomic_bool m_running;   // 実行中フラグ
+    bool m_running;   // 実行中フラグ
 
     int  m_len_ms      = 0;       // リングバッファで保持したい長さ[ms]
     int  m_sample_rate = 0;
