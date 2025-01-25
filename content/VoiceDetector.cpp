@@ -30,23 +30,23 @@ public:
         // pullモードでは読み取りはしないので、常に0を返す
         return 0;
     }
-    qint64 writeData(const char *data, qint64 len) override {
+    qint64 writeData(const char *data, qint64 data_len_in_bytes) override {
         // ここでオーディオデータを受け取る
         // もし VoiceDetector が停止中ならすぐ返す
         if (!m_detector->m_running.load()) {
-            return len; // 受け取るだけ受け取って破棄
+            return data_len_in_bytes; // 受け取るだけ受け取って破棄
         }
 
         // データを float として解釈
         //   preferredFormat() が Int16 などの場合は自前で変換が必要 (省略)
         //   ここでは Float前提で進める例に
-        size_t n_samples = static_cast<size_t>(len / sizeof(float));
-        const float *samples = reinterpret_cast<const float*>(data);
+        size_t sample_counts = static_cast<size_t>(data_len_in_bytes / sizeof(float));
+        const float *audio_samples = reinterpret_cast<const float*>(data);
 
         // 1) シグナル発行用のベクタを確保
-        std::vector<float> chunkVec(n_samples);
-        for (size_t i = 0; i < n_samples; i++) {
-            chunkVec[i] = samples[i];
+        std::vector<float> chunkVec(sample_counts);
+        for (size_t i = 0; i < sample_counts; i++) {
+            chunkVec[i] = audio_samples[i];
         }
 
         // 2) シグナル送信
@@ -55,29 +55,29 @@ public:
         // 3) リングバッファに格納
         QMutexLocker locker(&m_detector->m_mutex);
 
-        if (n_samples > m_detector->m_audio.size()) {
+        if (sample_counts > m_detector->m_audio_ring_buffer.size()) {
             // 入りきらない場合は最後の分だけ
-            size_t discard = n_samples - m_detector->m_audio.size();
-            samples += discard;
-            n_samples = m_detector->m_audio.size();
+            size_t discard = sample_counts - m_detector->m_audio_ring_buffer.size();
+            audio_samples += discard;
+            sample_counts = m_detector->m_audio_ring_buffer.size();
         }
 
         size_t pos = m_detector->m_audio_pos;
-        size_t bufSize = m_detector->m_audio.size();
+        size_t bufSize = m_detector->m_audio_ring_buffer.size();
 
-        if (pos + n_samples > bufSize) {
+        if (pos + sample_counts > bufSize) {
             const size_t n0 = bufSize - pos;
-            std::memcpy(&m_detector->m_audio[pos], samples, n0 * sizeof(float));
-            std::memcpy(&m_detector->m_audio[0], samples + n0, (n_samples - n0) * sizeof(float));
-            m_detector->m_audio_pos = (pos + n_samples) % bufSize;
+            std::memcpy(&m_detector->m_audio_ring_buffer[pos], audio_samples, n0 * sizeof(float));
+            std::memcpy(&m_detector->m_audio_ring_buffer[0], audio_samples + n0, (sample_counts - n0) * sizeof(float));
+            m_detector->m_audio_pos = (pos + sample_counts) % bufSize;
             m_detector->m_audio_len = bufSize; // バッファ満杯
         } else {
-            std::memcpy(&m_detector->m_audio[pos], samples, n_samples * sizeof(float));
-            m_detector->m_audio_pos = (pos + n_samples) % bufSize;
-            m_detector->m_audio_len = std::min(m_detector->m_audio_len + n_samples, bufSize);
+            std::memcpy(&m_detector->m_audio_ring_buffer[pos], audio_samples, sample_counts * sizeof(float));
+            m_detector->m_audio_pos = (pos + sample_counts) % bufSize;
+            m_detector->m_audio_len = std::min(m_detector->m_audio_len + sample_counts, bufSize);
         }
 
-        return len;
+        return data_len_in_bytes;
     }
 
 private:
@@ -123,7 +123,7 @@ bool VoiceDetector::init(int sampleRate, int channelCount)
     const size_t bufferSize = static_cast<size_t>(m_sample_rate)
                               * m_len_ms / 1000
                               * channelCount;
-    m_audio.resize(bufferSize, 0.0f);
+    m_audio_ring_buffer.resize(bufferSize, 0.0f);
     m_audio_pos = 0;
     m_audio_len = 0;
 
@@ -237,7 +237,7 @@ bool VoiceDetector::clear()
     QMutexLocker locker(&m_mutex);
     m_audio_pos = 0;
     m_audio_len = 0;
-    std::fill(m_audio.begin(), m_audio.end(), 0.0f);
+    std::fill(m_audio_ring_buffer.begin(), m_audio_ring_buffer.end(), 0.0f);
     qDebug() << "[VoiceDetector] buffer cleared";
     return true;
 }
@@ -272,14 +272,14 @@ void VoiceDetector::get(int ms, std::vector<float> & result)
     // リングバッファの末尾から n_samples 分をコピー
     int s0 = static_cast<int>(m_audio_pos) - static_cast<int>(n_samples);
     if (s0 < 0) {
-        s0 += m_audio.size();
+        s0 += m_audio_ring_buffer.size();
     }
 
-    if (static_cast<size_t>(s0) + n_samples > m_audio.size()) {
-        size_t n0 = m_audio.size() - s0;
-        std::memcpy(result.data(), &m_audio[s0], n0 * sizeof(float));
-        std::memcpy(result.data() + n0, &m_audio[0], (n_samples - n0) * sizeof(float));
+    if (static_cast<size_t>(s0) + n_samples > m_audio_ring_buffer.size()) {
+        size_t n0 = m_audio_ring_buffer.size() - s0;
+        std::memcpy(result.data(), &m_audio_ring_buffer[s0], n0 * sizeof(float));
+        std::memcpy(result.data() + n0, &m_audio_ring_buffer[0], (n_samples - n0) * sizeof(float));
     } else {
-        std::memcpy(result.data(), &m_audio[s0], n_samples * sizeof(float));
+        std::memcpy(result.data(), &m_audio_ring_buffer[s0], n_samples * sizeof(float));
     }
 }

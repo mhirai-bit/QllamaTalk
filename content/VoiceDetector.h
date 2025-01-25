@@ -52,7 +52,7 @@ signals:
 
 private:
     // リングバッファ関連
-    std::vector<float> m_audio;    // バッファ
+    std::vector<float> m_audio_ring_buffer;    // バッファ
     size_t             m_audio_pos = 0;
     size_t             m_audio_len = 0;
 
