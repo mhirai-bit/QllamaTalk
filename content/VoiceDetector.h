@@ -6,7 +6,6 @@
 #include <QByteArray>
 #include <QAudioFormat>
 #include <QIODevice>
-#include <QMutex>
 #include <atomic>
 #include <vector>
 
@@ -40,10 +39,6 @@ public:
 
     bool resume();
     bool pause();
-    bool clear();
-
-    // リングバッファから一定時間(ms)のサンプルを取得して返す
-    void get(int ms, std::vector<float> & result);
 
 signals:
     // pull デバイスから読み取ったサンプルを通知
@@ -51,12 +46,6 @@ signals:
     void audioAvailable(const std::vector<float> & chunk);
 
 private:
-    // リングバッファ関連
-    std::vector<float> m_audio_ring_buffer;    // バッファ
-    size_t             m_audio_pos = 0;
-    size_t             m_audio_len = 0;
-
-    QMutex m_mutex;               // 排他制御
     std::atomic_bool m_running;   // 実行中フラグ
 
     int  m_len_ms      = 0;       // リングバッファで保持したい長さ[ms]

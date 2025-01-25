@@ -54,7 +54,7 @@ private:
     VoiceRecParams  m_params;
 
     // 音声保存用
-    std::vector<float> m_buffer;
+    std::vector<float> m_capturedAudio;
 
     QTimer * m_timer = nullptr;
     bool     m_running = false;

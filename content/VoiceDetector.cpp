@@ -5,7 +5,6 @@
 #include <QAudioFormat>
 #include <QDebug>
 #include <QThread>
-#include <algorithm>
 #include <cstring> // memcpy
 
 //-------------------------
@@ -16,7 +15,7 @@ class VoicePullIODevice : public QIODevice
 public:
     explicit VoicePullIODevice(VoiceDetector *detector, QObject *parent = nullptr)
         : QIODevice(parent)
-        , m_detector(detector)
+        , m_voice_detector(detector)
     {
     }
 
@@ -31,9 +30,10 @@ public:
         return 0;
     }
     qint64 writeData(const char *data, qint64 data_len_in_bytes) override {
+        qDebug() << "writeData() thread =" << QThread::currentThread();
         // ここでオーディオデータを受け取る
         // もし VoiceDetector が停止中ならすぐ返す
-        if (!m_detector->m_running.load()) {
+        if (!m_voice_detector->m_running.load()) {
             return data_len_in_bytes; // 受け取るだけ受け取って破棄
         }
 
@@ -50,38 +50,13 @@ public:
         }
 
         // 2) シグナル送信
-        emit m_detector->audioAvailable(chunkVec);
-
-        // 3) リングバッファに格納
-        QMutexLocker locker(&m_detector->m_mutex);
-
-        if (sample_counts > m_detector->m_audio_ring_buffer.size()) {
-            // 入りきらない場合は最後の分だけ
-            size_t discard = sample_counts - m_detector->m_audio_ring_buffer.size();
-            audio_samples += discard;
-            sample_counts = m_detector->m_audio_ring_buffer.size();
-        }
-
-        size_t pos = m_detector->m_audio_pos;
-        size_t bufSize = m_detector->m_audio_ring_buffer.size();
-
-        if (pos + sample_counts > bufSize) {
-            const size_t n0 = bufSize - pos;
-            std::memcpy(&m_detector->m_audio_ring_buffer[pos], audio_samples, n0 * sizeof(float));
-            std::memcpy(&m_detector->m_audio_ring_buffer[0], audio_samples + n0, (sample_counts - n0) * sizeof(float));
-            m_detector->m_audio_pos = (pos + sample_counts) % bufSize;
-            m_detector->m_audio_len = bufSize; // バッファ満杯
-        } else {
-            std::memcpy(&m_detector->m_audio_ring_buffer[pos], audio_samples, sample_counts * sizeof(float));
-            m_detector->m_audio_pos = (pos + sample_counts) % bufSize;
-            m_detector->m_audio_len = std::min(m_detector->m_audio_len + sample_counts, bufSize);
-        }
+        emit m_voice_detector->audioAvailable(chunkVec);
 
         return data_len_in_bytes;
     }
 
 private:
-    VoiceDetector *m_detector = nullptr;
+    VoiceDetector *m_voice_detector = nullptr;
 };
 
 //-------------------------
@@ -118,14 +93,6 @@ bool VoiceDetector::init(int sampleRate, int channelCount)
     }
 
     m_sample_rate = sampleRate;
-
-    // リングバッファのサイズを確保 (サンプルレート * len_ms / 1000)
-    const size_t bufferSize = static_cast<size_t>(m_sample_rate)
-                              * m_len_ms / 1000
-                              * channelCount;
-    m_audio_ring_buffer.resize(bufferSize, 0.0f);
-    m_audio_pos = 0;
-    m_audio_len = 0;
 
     // 1) デバイス取得
     QAudioDevice device = QMediaDevices::defaultAudioInput();
@@ -179,8 +146,7 @@ bool VoiceDetector::init(int sampleRate, int channelCount)
             });
 
     m_initialized = true;
-    qDebug() << "[VoiceDetector] init done. bufferSize =" << bufferSize
-             << "m_audioSource state =" << m_audioSource->state();
+    qDebug() << "[VoiceDetector] init done. m_audioSource state =" << m_audioSource->state();
     return true;
 }
 
@@ -221,65 +187,4 @@ bool VoiceDetector::pause()
 
     qDebug() << "[VoiceDetector] pause capturing. state =" << m_audioSource->state();
     return true;
-}
-
-bool VoiceDetector::clear()
-{
-    if (!m_initialized) {
-        qWarning() << "[VoiceDetector] not initialized";
-        return false;
-    }
-    if (!m_running.load()) {
-        qWarning() << "[VoiceDetector] not running, cannot clear buffer";
-        return false;
-    }
-
-    QMutexLocker locker(&m_mutex);
-    m_audio_pos = 0;
-    m_audio_len = 0;
-    std::fill(m_audio_ring_buffer.begin(), m_audio_ring_buffer.end(), 0.0f);
-    qDebug() << "[VoiceDetector] buffer cleared";
-    return true;
-}
-
-void VoiceDetector::get(int ms, std::vector<float> & result)
-{
-    if (!m_initialized) {
-        qWarning() << "[VoiceDetector] not initialized";
-        return;
-    }
-    if (!m_running.load()) {
-        qWarning() << "[VoiceDetector] not running. cannot get()";
-        return;
-    }
-
-    QMutexLocker locker(&m_mutex);
-
-    result.clear();
-    if (ms <= 0) {
-        ms = m_len_ms;
-    }
-
-    size_t n_samples = static_cast<size_t>(
-        double(m_sample_rate) * ms / 1000.0
-        );
-    if (n_samples > m_audio_len) {
-        n_samples = m_audio_len;
-    }
-
-    result.resize(n_samples);
-
-    // リングバッファの末尾から n_samples 分をコピー
-    int s0 = static_cast<int>(m_audio_pos) - static_cast<int>(n_samples);
-    if (s0 < 0) {
-        s0 += m_audio_ring_buffer.size();
-    }
-
-    if (static_cast<size_t>(s0) + n_samples > m_audio_ring_buffer.size()) {
-        size_t n0 = m_audio_ring_buffer.size() - s0;
-        std::memcpy(result.data(), &m_audio_ring_buffer[s0], n0 * sizeof(float));
-        std::memcpy(result.data() + n0, &m_audio_ring_buffer[0], (n_samples - n0) * sizeof(float));
-    } else {
-        std::memcpy(result.data(), &m_audio_ring_buffer[s0], n_samples * sizeof(float));
-    }
 }

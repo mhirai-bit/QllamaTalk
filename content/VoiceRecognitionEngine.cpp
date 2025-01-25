@@ -42,9 +42,9 @@ bool VoiceRecognitionEngine::initWhisper(const VoiceRecParams &params)
 void VoiceRecognitionEngine::addAudio(const std::vector<float> & pcms)
 {
     // 単純に追加
-    m_buffer.insert(m_buffer.end(), pcms.begin(), pcms.end());
+    m_capturedAudio.insert(m_capturedAudio.end(), pcms.begin(), pcms.end());
     qDebug() << "[VoiceRecognitionEngine] addAudio() => added"
-             << pcms.size() << "samples. total buffer size =" << m_buffer.size();
+             << pcms.size() << "samples. total buffer size =" << m_capturedAudio.size();
 }
 
 void VoiceRecognitionEngine::start()
@@ -83,9 +83,9 @@ void VoiceRecognitionEngine::stop()
 void VoiceRecognitionEngine::processVadCheck()
 {
     if (!m_running) return;
-    qDebug() << "[VoiceRecognitionEngine] processVadCheck. buffer size =" << m_buffer.size();
+    qDebug() << "[VoiceRecognitionEngine] processVadCheck. buffer size =" << m_capturedAudio.size();
 
-    if (m_buffer.size() < 16000 * 2) {
+    if (m_capturedAudio.size() < 16000 * 2) {
         // 2秒分ないとVADチェックできない (例)
         return;
     }
@@ -99,10 +99,10 @@ void VoiceRecognitionEngine::processVadCheck()
 
     // 直近2秒分コピー
     const int n_get = 16000 * 2;
-    if (int(m_buffer.size()) < n_get) return;
+    if (int(m_capturedAudio.size()) < n_get) return;
 
     std::vector<float> pcmf32_new(n_get);
-    memcpy(pcmf32_new.data(), &m_buffer[m_buffer.size() - n_get], n_get * sizeof(float));
+    memcpy(pcmf32_new.data(), &m_capturedAudio[m_capturedAudio.size() - n_get], n_get * sizeof(float));
 
     // 簡易VAD
     if (!vad_simple(pcmf32_new, COMMON_SAMPLE_RATE, 1000,
@@ -114,14 +114,14 @@ void VoiceRecognitionEngine::processVadCheck()
 
     // 音声アリ → length_ms分を取り出して認識
     const int n_len = (COMMON_SAMPLE_RATE * m_params.length_ms) / 1000;
-    if (int(m_buffer.size()) < n_len) {
+    if (int(m_capturedAudio.size()) < n_len) {
         // データが不十分
         qDebug() << "[VoiceRecognitionEngine] Not enough data for inference yet.";
         return;
     }
 
     std::vector<float> pcmf32(n_len);
-    memcpy(pcmf32.data(), &m_buffer[m_buffer.size() - n_len], n_len*sizeof(float));
+    memcpy(pcmf32.data(), &m_capturedAudio[m_capturedAudio.size() - n_len], n_len*sizeof(float));
 
     qDebug() << "[VoiceRecognitionEngine] VAD => speech detected. Running whisper...";
     runWhisper(pcmf32);
