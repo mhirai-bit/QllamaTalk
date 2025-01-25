@@ -1,5 +1,6 @@
 #include "VoiceDetector.h"
 
+#include <QCoreApplication>
 #include <QMediaDevices>
 #include <QAudioFormat>
 #include <QDebug>
@@ -119,33 +120,44 @@ bool VoiceDetector::init(int sampleRate, int channelCount)
     m_sample_rate = sampleRate;
 
     // リングバッファのサイズを確保 (サンプルレート * len_ms / 1000)
-    const size_t bufferSize = static_cast<size_t>(m_sample_rate) * m_len_ms / 1000 * channelCount;
+    const size_t bufferSize = static_cast<size_t>(m_sample_rate)
+                              * m_len_ms / 1000
+                              * channelCount;
     m_audio.resize(bufferSize, 0.0f);
     m_audio_pos = 0;
     m_audio_len = 0;
 
-    // QAudioFormat 設定
+    // 1) デバイス取得
     QAudioDevice device = QMediaDevices::defaultAudioInput();
+    if (!device.isNull()) {
+        qDebug() << "[VoiceDetector] default audio input device:"
+                 << device.description();
+    }
+
+    // 2) QAudioFormat: サンプルフォーマットに Float を優先
     QAudioFormat format;
-    // 例: まずは device.preferredFormat() を使う。あるいは明示的に Int16 でやる等
-    format = device.preferredFormat();
-    // ここでログを出す
-    qDebug() << "[VoiceDetector] device.preferredFormat ="
-             << format.sampleRate() << format.channelCount() << format.sampleFormat();
+    format.setSampleRate(m_sample_rate);
+    format.setChannelCount(channelCount);
+    format.setSampleFormat(QAudioFormat::Float);
 
-    // (必要があれば format.setSampleRate(sampleRate), setChannelCount(channelCount) 等)
-    // format.setSampleRate(m_sample_rate);
-    // format.setChannelCount(channelCount);
-    // format.setSampleFormat(QAudioFormat::Float);
+    // 3) Float形式がサポートされるかチェック
+    if (!device.isFormatSupported(format)) {
+        // サポートされない → エラーを出力し、プログラム終了
+        qCritical() << "[VoiceDetector] Error: Float format is NOT supported by the device!"
+                    << "sampleRate=" << m_sample_rate
+                    << "ch=" << channelCount;
+        QCoreApplication::exit(1);
+        return false; // (到達しないかもしれませんが念のため)
+    }
 
-    // QAudioSourceの作成
+    // 4) QAudioSourceの生成（pullモード前提）
     m_audioSource = new QAudioSource(device, format, this);
     if (!m_audioSource) {
         qWarning() << "[VoiceDetector] Failed to create QAudioSource";
         return false;
     }
 
-    // pullモード用の QIODevice を作成
+    // 5) pullモード用の QIODevice を作成 (例: VoicePullIODevice)
     m_pullDevice = new VoicePullIODevice(this, this);
     if (!m_pullDevice->open(QIODevice::WriteOnly)) {
         qWarning() << "[VoiceDetector] Failed to open pullDevice";
@@ -156,12 +168,12 @@ bool VoiceDetector::init(int sampleRate, int channelCount)
         return false;
     }
 
-    // QAudioSource を start() するが、第1引数に "pullモード用のIOデバイス" を渡す
+    // 6) QAudioSource を start() し、pullDevice に書き込みさせる
     m_audioSource->start(m_pullDevice);
 
-    // ここで state が変わるか確認 (デバッグ用)
+    // debug: stateChanged を監視
     connect(m_audioSource, &QAudioSource::stateChanged,
-            this, [this](QAudio::State newState){
+            this, [this](QAudio::State newState) {
                 qDebug() << "[VoiceDetector] stateChanged ->" << newState
                          << "error=" << m_audioSource->error();
             });
@@ -169,9 +181,9 @@ bool VoiceDetector::init(int sampleRate, int channelCount)
     m_initialized = true;
     qDebug() << "[VoiceDetector] init done. bufferSize =" << bufferSize
              << "m_audioSource state =" << m_audioSource->state();
-
     return true;
 }
+
 
 bool VoiceDetector::resume()
 {
