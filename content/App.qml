@@ -280,16 +280,10 @@ ApplicationWindow {
                     } else {
                         tts.stateChanged.connect(voiceSettingsExpander.engineReady)
                     }
-
-                    tts.updateStateLabel(tts.state)
                 }
 
                 function engineReady() {
                     tts.stateChanged.disconnect(voiceSettingsExpander.engineReady)
-                    if (tts.state != TextToSpeech.Ready) {
-                        tts.updateStateLabel(tts.state)
-                        return;
-                    }
                     updateLocales()
                     updateVoices()
                 }
@@ -321,6 +315,7 @@ ApplicationWindow {
                                 font.pointSize: 16
                                 enabled: tts.state === TextToSpeech.Ready
                                 Component.onCompleted: {
+                                    tts.engine = textAt(currentIndex)
                                     currentIndex = tts.availableEngines().indexOf(tts.engine)
                                     tts.engine = textAt(currentIndex)
                                 }
@@ -352,7 +347,7 @@ ApplicationWindow {
                                 onActivated: {
                                     let locales = tts.availableLocales()
                                     tts.locale = locales[currentIndex]
-                                    voiceSettingsExpander.updateVoices()
+                                    updateVoices()
                                 }
                                 Layout.fillWidth: true
                             }
