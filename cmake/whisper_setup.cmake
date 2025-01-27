@@ -100,6 +100,7 @@ elseif(ANDROID)
     )
 else()
     # Windows / Linux / etc.
+    set(WHISPER_BUILD_DIR "${WHISPER_SOURCE_DIR}/build")
 endif()
 
 # ----------------------------------------------------------------------------
@@ -117,6 +118,7 @@ if(NOT EXISTS "${WHISPER_BUILD_STAMP}")
         COMMAND "${CMAKE_COMMAND}"
                 -B "${WHISPER_BUILD_DIR}"
                 -S "${WHISPER_SOURCE_DIR}"
+                -G "${CMAKE_GENERATOR}"
                 ${IOS_BUILD_OPTIONS}
                 ${ANDROID_BUILD_OPTIONS}
                 ${COREML_OPTION}

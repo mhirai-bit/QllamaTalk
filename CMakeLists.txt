@@ -12,6 +12,7 @@ project(QllamaTalkApp LANGUAGES CXX)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_llama_model.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/llama_setup.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_whisper_model.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/llmRemoteServer_setup.cmake)
 
 set(CMAKE_AUTOMOC ON)
 
@@ -29,11 +30,16 @@ endif()
 # ----------------------------------------------------------------------------
 qt_add_executable(QllamaTalkApp
     src/main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/AndroidManifest.xml
-    ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/build.gradle
-    ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/res/values/libs.xml
-    ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/res/xml/qtprovider_paths.xml
 )
+
+if(ANDROID)
+    target_sources(QllamaTalkApp PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/AndroidManifest.xml
+        ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/build.gradle
+        ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/res/values/libs.xml
+        ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/res/xml/qtprovider_paths.xml
+    )
+endif()
 
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/whisper_setup.cmake)
 
