@@ -135,6 +135,7 @@ void VoiceRecognitionEngine::runWhisper(const std::vector<float> & audio_for_inf
 {
     if (!m_ctx) return;
 
+    // Whisper の推論パラメータを設定
     whisper_full_params wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
     wparams.print_progress   = false;
     wparams.print_special    = false;
@@ -142,15 +143,31 @@ void VoiceRecognitionEngine::runWhisper(const std::vector<float> & audio_for_inf
     wparams.print_timestamps = false;
     wparams.translate        = false;
     wparams.single_segment   = true;
-    wparams.language         = m_whisper_params.language.c_str();
-    wparams.n_threads        = 4; // 例
+    wparams.language         = m_whisper_params.language.c_str(); // "auto" or e.g. "en", "ja"
+    wparams.n_threads        = 4; // 適宜
 
+    // 推論実行
     int ret = whisper_full(m_ctx, wparams, audio_for_inference.data(), audio_for_inference.size());
     if (ret != 0) {
         qWarning() << "[VoiceRecognitionEngine] whisper_full failed with code:" << ret;
         return;
     }
-    // テキストをまとめる
+
+    // ■「自動言語検出」を使っている場合、Whisper が検出した言語IDを取得
+    //   (もちろん "auto" 以外でも呼び出せますが、英語専用モデルなどでは正しく動作しない場合も)
+    if (strcmp(m_whisper_params.language.c_str(), "auto") == 0) {
+        int detectedLangId = whisper_full_lang_id(m_ctx);  // -1 の場合は検出失敗
+        if (detectedLangId >= 0) {
+            const char * detectedLangCode = whisper_lang_str(detectedLangId);
+            // 必要であれば、検出言語をメンバ変数に保存するなど:
+            QLocale locale(QString::fromLatin1(detectedLangCode));
+            setDetectedVoiceLocale(locale);
+        } else {
+            qWarning() << "[VoiceRecognitionEngine] Failed to detect language.";
+        }
+    }
+
+    // ■ Whisper の文字起こし結果を取得
     QString result;
     int n_segments = whisper_full_n_segments(m_ctx);
     for (int i = 0; i < n_segments; i++) {
@@ -158,9 +175,20 @@ void VoiceRecognitionEngine::runWhisper(const std::vector<float> & audio_for_inf
         result += QString::fromUtf8(seg_txt);
     }
 
-    // デバッグ出力
-    // qDebug() << "[VoiceRecognitionEngine] recognized text:" << result;
-
-    // シグナルで外部に伝える
+    // 結果をシグナルで外部へ通知
     emit textRecognized(result);
 }
+
+QLocale VoiceRecognitionEngine::detectedVoiceLocale() const
+{
+    return m_detectedVoiceLocale;
+}
+
+void VoiceRecognitionEngine::setDetectedVoiceLocale(const QLocale &newDetectedVoiceLocale)
+{
+    if (m_detectedVoiceLocale == newDetectedVoiceLocale)
+        return;
+    m_detectedVoiceLocale = newDetectedVoiceLocale;
+    emit detectedVoiceLocaleChanged(m_detectedVoiceLocale);
+}
+

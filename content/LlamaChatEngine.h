@@ -100,6 +100,11 @@ class LlamaChatEngine : public QObject
                        NOTIFY modelDownloadInProgressChanged
                            FINAL)
 
+    Q_PROPERTY(QLocale detectedVoiceLocale
+                   READ detectedVoiceLocale
+                           NOTIFY detectedVoiceLocaleChanged
+                           FINAL)
+
 public:
     //--------------------------------------------------------------------------
     // EngineMode Enum (エンジンモード列挙: ローカル/リモート/未初期化)
@@ -164,6 +169,10 @@ public:
     bool modelDownloadInProgress() const;
     void setModelDownloadInProgress(bool newModelDownloadInProgress);
 
+    QLocale detectedVoiceLocale() const;
+
+    void setDetectedVoiceLocale(const QLocale &newDetectedVoiceLocale);
+
 public slots:
     //--------------------------------------------------------------------------
     // Public Slots (外部/QMLなどから呼ばれる可能性のあるSlots)
@@ -189,6 +198,8 @@ signals:
     void modelDownloadFinished(bool success);
     void modelDownloadProgressChanged();
     void modelDownloadInProgressChanged();
+
+    void detectedVoiceLocaleChanged();
 
 private slots:
     //--------------------------------------------------------------------------
@@ -307,6 +318,7 @@ private:
 
     VoiceRecognitionEngine* m_voiceRecognitionEngine = nullptr;
     VoiceDetector*          m_voiceDetector = nullptr;
+    QLocale                 m_detectedVoiceLocale;
 
     // Additional helper connection setup/teardown
     void setupRemoteConnections();

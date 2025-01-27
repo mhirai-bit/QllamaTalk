@@ -140,14 +140,14 @@ ApplicationWindow {
 
         onStateChanged: {
             switch (state) {
-            case TextToSpeech.Ready:
+                case TextToSpeech.Ready:
                 LlamaChatEngine.resumeVoiceDetection()
                 break
-            case TextToSpeech.Speaking:
+                case TextToSpeech.Speaking:
                 break
-            case TextToSpeech.Paused:
+                case TextToSpeech.Paused:
                 break
-            case TextToSpeech.Error:
+                case TextToSpeech.Error:
                 break
             }
         }
@@ -273,6 +273,76 @@ ApplicationWindow {
                 property list<string> allVoices: []
                 property int currentVoiceIndex: 0
 
+                Connections {
+                    target: LlamaChatEngine
+                    function onDetectedVoiceLocaleChanged() {
+                        // ユーザーが喋った言語が LlamaChatEngine によって検出された
+                        let detectedLocale = LlamaChatEngine.detectedVoiceLocale
+
+                        // 安全策：無効なロケールならスキップ
+                        if (!detectedLocale || detectedLocale.language === "") {
+                            // TODO: エラーダイアログを表示
+                            console.log("Detected locale is invalid")
+                            return
+                        }
+
+                        // TextToSpeech が今使っているエンジンを覚えておく
+                        let originalEngine = tts.engine
+
+                        // ロケールを設定しようと試みる補助関数
+                        //  - 現在のエンジンで tts.availableLocales() をチェックし、
+                        //    "同じ言語" を持つ QLocale があれば tts.locale にセットして true を返す
+                        //  - 見つからなければ false を返す
+                        function trySetTtsLocale(locale) {
+                            let locales = tts.availableLocales()
+                            console.log("locales = ", locales)
+                            for (let i = 0; i < locales.length; i++) {
+                                // QMLではオブジェクト比較が難しいため、language や name() を比較するのが簡単
+                                if (locales[i].name === locale.name) {
+                                    tts.locale = locales[i]
+                                    // UI 表示を最新化
+                                    voiceSettingsExpander.updateLocales()
+                                    voiceSettingsExpander.updateVoices()
+                                    return true
+                                }
+                            }
+                            return false
+                        }
+
+                        // 1) まずは現在のエンジンで試してみる
+                        if (trySetTtsLocale(detectedLocale)) {
+                            return
+                        }
+
+                        // 2) 対応していなければ、ほかのエンジンを順に試す
+                        let engines = tts.availableEngines()
+                        for (let i = 0; i < engines.length; i++) {
+                            // 今のエンジンは既に試したのでスキップ
+                            if (engines[i] === originalEngine) {
+                                continue
+                            }
+
+                            // エンジン切り替え
+                            tts.engine = engines[i]
+                            // 再度トライ
+                            if (trySetTtsLocale(detectedLocale)) {
+                                return
+                            }
+                        }
+
+                        // 3) すべてのエンジンを試してもダメなら、元のエンジンに戻してエラーダイアログ
+                        tts.engine = originalEngine
+
+                        // ここでは例として、すでにあるエラーダイアログを再利用か、
+                        // または別のダイアログを用意してもOK
+                        remoteAIErrorDialog.errorMessage = "No TTS engine found that supports: "
+                                + detectedLocale.nativeLanguageName
+                        remoteAIErrorDialog.text = qsTr("No Speech Engine Found")
+                        remoteAIErrorDialog.informativeText = qsTr("Failed to find a TTS engine supporting this language")
+                        remoteAIErrorDialog.open()
+                    }
+                }
+
                 Component.onCompleted: {
                     // some engines initialize asynchronously
                     if (tts.state == TextToSpeech.Ready) {
@@ -347,7 +417,7 @@ ApplicationWindow {
                                 onActivated: {
                                     let locales = tts.availableLocales()
                                     tts.locale = locales[currentIndex]
-                                    updateVoices()
+                                    voiceSettingsExpander.updateVoices()
                                 }
                                 Layout.fillWidth: true
                             }

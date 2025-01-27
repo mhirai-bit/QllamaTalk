@@ -677,7 +677,7 @@ void LlamaChatEngine::initVoiceRecognition()
 
     // Whisper設定
     VoiceRecParams vrParams;
-    vrParams.language = "en";
+    vrParams.language = "auto";
     vrParams.model    = WHISPER_MODEL_NAME;
     vrParams.length_for_inference_ms  = 10000;  // 10秒取りたい
     vrParams.vad_thold  = 0.6f;
@@ -693,6 +693,9 @@ void LlamaChatEngine::initVoiceRecognition()
     // シグナル接続: 音声認識結果 -> handleRecognizedText()
     connect(m_voiceRecognitionEngine, &VoiceRecognitionEngine::textRecognized,
             this, &LlamaChatEngine::handleRecognizedText);
+    // whisperが検知した言語が変わったらdetectedVoiceLocaleにセット
+    connect(m_voiceRecognitionEngine, &VoiceRecognitionEngine::detectedVoiceLocaleChanged,
+            this, &LlamaChatEngine::setDetectedVoiceLocale);
 
     if (!m_voiceDetector) {
         m_voiceDetector = new VoiceDetector(vrParams.length_for_inference_ms, this);
@@ -725,6 +728,19 @@ void LlamaChatEngine::stopVoiceRecognition()
     if (m_voiceRecognitionEngine && m_voiceRecognitionEngine->isRunning()) {
         m_voiceRecognitionEngine->stop();
     }
+}
+
+void LlamaChatEngine::setDetectedVoiceLocale(const QLocale &newDetectedVoiceLocale)
+{
+    if (m_detectedVoiceLocale == newDetectedVoiceLocale)
+        return;
+    m_detectedVoiceLocale = newDetectedVoiceLocale;
+    emit detectedVoiceLocaleChanged();
+}
+
+QLocale LlamaChatEngine::detectedVoiceLocale() const
+{
+    return m_detectedVoiceLocale;
 }
 
 void LlamaChatEngine::handleRecognizedText(const QString &text)

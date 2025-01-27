@@ -14,11 +14,6 @@ cmake_minimum_required(VERSION 3.15)
 # ----------------------------------------------------------------------------
 set(WHISPER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/whisper.cpp")
 
-# Whisperモデルファイル (例: base.en)
-set(WHISPER_MODEL_PATH "${WHISPER_SOURCE_DIR}/models/ggml-base.en.bin")
-# ファイル名だけ (C++から参照するため)
-set(WHISPER_MODEL_NAME "ggml-base.en.bin")
-
 # ----------------------------------------------------------------------------
 # 2) サブモジュール初期化 & 特定コミットへチェックアウト
 # ----------------------------------------------------------------------------
@@ -149,15 +144,15 @@ set(WHISPER_LIB_FILE_DIR  "${WHISPER_BUILD_DIR}/src")
 set(WHISPER_INCLUDE_DIR   "${WHISPER_SOURCE_DIR}/include")
 
 message(STATUS "----- Whisper Setup Variables (Debug Print) -----")
-message(STATUS "WHISPER_SOURCE_DIR       = ${WHISPER_SOURCE_DIR}")
-message(STATUS "WHISPER_TARGET_COMMIT    = ${WHISPER_TARGET_COMMIT}")
-message(STATUS "WHISPER_CURRENT_COMMIT   = ${WHISPER_CURRENT_COMMIT}")
-message(STATUS "WHISPER_BUILD_DIR        = ${WHISPER_BUILD_DIR}")
-message(STATUS "WHISPER_BUILD_STAMP      = ${WHISPER_BUILD_STAMP}")
-message(STATUS "WHISPER_LIB_FILE_DIR     = ${WHISPER_LIB_FILE_DIR}")
-message(STATUS "WHISPER_INCLUDE_DIR      = ${WHISPER_INCLUDE_DIR}")
-message(STATUS "WHISPER_USE_COREML       = ${WHISPER_USE_COREML}")
-message(STATUS "WHISPER_MODEL_PATH       = ${WHISPER_MODEL_PATH}")
+message(STATUS "WHISPER_SOURCE_DIR        = ${WHISPER_SOURCE_DIR}")
+message(STATUS "WHISPER_TARGET_COMMIT     = ${WHISPER_TARGET_COMMIT}")
+message(STATUS "WHISPER_CURRENT_COMMIT    = ${WHISPER_CURRENT_COMMIT}")
+message(STATUS "WHISPER_BUILD_DIR         = ${WHISPER_BUILD_DIR}")
+message(STATUS "WHISPER_BUILD_STAMP       = ${WHISPER_BUILD_STAMP}")
+message(STATUS "WHISPER_LIB_FILE_DIR      = ${WHISPER_LIB_FILE_DIR}")
+message(STATUS "WHISPER_INCLUDE_DIR       = ${WHISPER_INCLUDE_DIR}")
+message(STATUS "WHISPER_USE_COREML        = ${WHISPER_USE_COREML}")
+message(STATUS "WHISPER_MODEL_OUTPUT_PATH = ${WHISPER_MODEL_OUTPUT_PATH}")
 message(STATUS "WHISPER_MODEL_NAME        = ${WHISPER_MODEL_NAME}")
 message(STATUS "------------------------------------------------")
 
@@ -172,7 +167,7 @@ message(STATUS "------------------------------------------------")
 #
 add_custom_command(TARGET QllamaTalkApp POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy
-        "${WHISPER_MODEL_PATH}"
+        "${WHISPER_MODEL_OUTPUT_PATH}"
         "$<TARGET_FILE_DIR:QllamaTalkApp>/${WHISPER_MODEL_NAME}"
     COMMENT "Copying Whisper model to QllamaTalkApp binary directory"
 )

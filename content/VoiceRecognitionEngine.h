@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QTimer>
+#include <QLocale>
 #include <vector>
 #include <string>
 
@@ -23,6 +24,12 @@ struct VoiceRecParams {
 class VoiceRecognitionEngine : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(QLocale detectedVoiceLocale
+                   READ detectedVoiceLocale
+                       WRITE setDetectedVoiceLocale
+                           NOTIFY detectedVoiceLocaleChanged
+                               FINAL)
+
 public:
     explicit VoiceRecognitionEngine(QObject *parent = nullptr);
     ~VoiceRecognitionEngine();
@@ -42,10 +49,14 @@ public:
 
     void setLanguage(const QString & language);
 
+    QLocale detectedVoiceLocale() const;
+    void setDetectedVoiceLocale(const QLocale &newDetectedVoiceLocale);
+
 signals:
     // 音声が認識されテキストが確定したらemit
     void textRecognized(const QString & text);
 
+    void detectedVoiceLocaleChanged(const QLocale&);
 private slots:
     void processVadCheck();
 
@@ -60,6 +71,8 @@ private:
 
     QTimer * m_timer = nullptr;
     bool     m_running = false;
+
+    QLocale m_detectedVoiceLocale;
 };
 
 #endif // VOICERECOGNITIONENGINE_H
