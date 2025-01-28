@@ -142,7 +142,11 @@ endif()
 # ----------------------------------------------------------------------------
 # 8) 上位 CMake に返す変数定義 (ライブラリパス, インクルードパス など)
 # ----------------------------------------------------------------------------
-set(WHISPER_LIB_FILE_DIR  "${WHISPER_BUILD_DIR}/src")
+if(WIN32)
+    set(WHISPER_LIB_FILE_DIR  "${WHISPER_BUILD_DIR}/bin")
+else()
+    set(WHISPER_LIB_FILE_DIR  "${WHISPER_BUILD_DIR}/src")
+endif()
 set(WHISPER_INCLUDE_DIR   "${WHISPER_SOURCE_DIR}/include")
 
 message(STATUS "----- Whisper Setup Variables (Debug Print) -----")

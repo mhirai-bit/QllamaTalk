@@ -135,6 +135,19 @@ if(WIN32)
         )
     endforeach()
 
+    # whisper*.dll をコピー (Copy whisper*.dll if multiple variants exist)
+    file(GLOB WHISPER_DLLS
+        "${WHISPER_LIB_FILE_DIR}/whisper*.dll"
+    )
+    foreach(dll_file ${WHISPER_DLLS})
+        add_custom_command(TARGET content POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${dll_file}"
+            "$<TARGET_FILE_DIR:QllamaTalkApp>"
+            COMMENT "Copying whisper DLLs to QllamaTalkApp"
+        )
+    endforeach()
+
 elseif(APPLE)
     if(IOS)
         # iOS: llama_setup.cmake でビルドされた libllama.a と
