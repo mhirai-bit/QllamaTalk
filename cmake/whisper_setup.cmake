@@ -148,6 +148,9 @@ else()
     set(WHISPER_LIB_FILE_DIR  "${WHISPER_BUILD_DIR}/src")
 endif()
 set(WHISPER_INCLUDE_DIR   "${WHISPER_SOURCE_DIR}/include")
+if(IOS)
+    set(WHISPER_STATIC_LIB_DIR "${WHISPER_BUILD_DIR}/src/Release-iphoneos")
+endif()
 
 message(STATUS "----- Whisper Setup Variables (Debug Print) -----")
 message(STATUS "WHISPER_SOURCE_DIR        = ${WHISPER_SOURCE_DIR}")
@@ -160,10 +163,11 @@ message(STATUS "WHISPER_INCLUDE_DIR       = ${WHISPER_INCLUDE_DIR}")
 message(STATUS "WHISPER_USE_COREML        = ${WHISPER_USE_COREML}")
 message(STATUS "WHISPER_MODEL_OUTPUT_PATH = ${WHISPER_MODEL_OUTPUT_PATH}")
 message(STATUS "WHISPER_MODEL_NAME        = ${WHISPER_MODEL_NAME}")
+message(STATUS "WHISPER_STATIC_LIB_DIR    = ${WHISPER_STATIC_LIB_DIR}")
 message(STATUS "------------------------------------------------")
 
 #
-# 9) モデルを QllamaTalkApp 実行ファイルの横にコピー
+# 9) モデルを QllamaTalkApp 実行ファイルの横にコピーß
 #    (ここでは、QllamaTalkApp という名称のターゲットが存在すると仮定)
 #
 # 例: ${CMAKE_RUNTIME_OUTPUT_DIRECTORY} に実行ファイルが出る場合や

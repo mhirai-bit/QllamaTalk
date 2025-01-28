@@ -901,11 +901,13 @@ bool speak_with_file(const std::string & command, const std::string & text, cons
     } else {
         speak_file.write(text.c_str(), text.size());
         speak_file.close();
-        int ret = system((command + " " + std::to_string(voice_id) + " " + path).c_str());
-        if (ret != 0) {
-            fprintf(stderr, "%s: failed to speak\n", __func__);
-            return false;
-        }
+
+        // system() fails build in iOS and since I'm not using this API in the first place, I just comment this out for now.
+        // int ret = system((command + " " + std::to_string(voice_id) + " " + path).c_str());
+        // if (ret != 0) {
+        //     fprintf(stderr, "%s: failed to speak\n", __func__);
+        //     return false;
+        // }
     }
     return true;
 }

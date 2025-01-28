@@ -172,6 +172,13 @@ elseif(APPLE)
             "${GGML_LIB_FILE_DIR}/ggml-blas/libggml-blas.a"
         )
 
+        # whisper 側の静的ライブラリを取得 (whipser.a)
+        set(WHISPER_STATIC_PATH "${WHISPER_STATIC_LIB_DIR}/libwhisper.a")
+        if(EXISTS "${WHISPER_STATIC_PATH}")
+            message(STATUS "Using libwhisper.a for iOS: ${WHISPER_STATIC_PATH}")
+        else()
+            message(FATAL_ERROR "Could not find whisper static library (libwhisper.a) in ${WHISPER_STATIC_LIB_DIR}")
+        endif()
         find_library(ACCELERATE Accelerate)
 
         if(ACCELERATE)
@@ -193,6 +200,7 @@ elseif(APPLE)
         set(ALL_LIBS
             ${LLAMA_STATIC_PATH}
             ${GGML_STATIC_LIBS}
+            ${WHISPER_STATIC_PATH}
             ${ACCELERATE}
         )
     else()

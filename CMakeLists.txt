@@ -13,7 +13,6 @@ include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_llama_model.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/llama_setup.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_whisper_model.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/llmRemoteServer_setup.cmake)
-
 set(CMAKE_AUTOMOC ON)
 
 # ----------------------------------------------------------------------------
@@ -57,6 +56,7 @@ if(IOS)
         ${asset_catalog_path}
         PROPERTIES MACOSX_PACKAGE_LOCATION Resources
     )
+    qt_add_ios_ffmpeg_libraries(QllamaTalkApp)
 endif()
 if(ANDROID)
     set_property(TARGET QllamaTalkApp PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
