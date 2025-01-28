@@ -178,13 +178,13 @@ ApplicationWindow {
                 id: connectionSettingsExpander
                 title: qsTr("Connection Settings")
                 property int modeComboCurrentIndex: 0
-                property int engineModeRowWidth
                 property string inputIpAddress: ""
                 property int portNumber: 0
                 model: [
                     Component {
                         RowLayout {
                             id: engineModeRowLayout
+                            width: connectionSettingsExpander.delegateWidth
                             spacing: 8
                             Label {
                                 id: modeLabel
@@ -194,7 +194,7 @@ ApplicationWindow {
                             }
                             ComboBox {
                                 id: modeCombo
-                                width: modeLabel.width * 1.5
+                                Layout.fillWidth: true
                                 model: [qsTr("Local"), qsTr("Remote")]
                                 currentIndex: mainWindow.isRemote ? 1 : 0
                                 font.pointSize: 16
@@ -202,43 +202,45 @@ ApplicationWindow {
                                     connectionSettingsExpander.modeComboCurrentIndex = modeCombo.currentIndex
                                 }
                             }
-                            Component.onCompleted: {
-                                connectionSettingsExpander.engineModeRowWidth = width
-                            }
                         }
                     },
                     Component {
                         // IP入力フィールド (regularExpressionValidatorの例)
-                        TextField {
-                            id: ipField
-                            width: connectionSettingsExpander.engineModeRowWidth
-                            placeholderText: qsTr("Enter server IP (e.g. 192.168.0.220)")
-                            enabled: connectionSettingsExpander.modeComboCurrentIndex === 1
-                            validator: RegularExpressionValidator {
-                                // IPv4用の簡易的な正規表現例 (完全には厳密ではありません)
-                                // 0~255の範囲もすべてはカバーできないシンプル例
-                                regularExpression: /^(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)$/
-                            }
-                            font.pointSize: 16
-                            onTextChanged: {
-                                connectionSettingsExpander.inputIpAddress = ipField.text
+                        RowLayout {
+                            width: connectionSettingsExpander.delegateWidth
+                            TextField {
+                                id: ipField
+                                Layout.fillWidth: true
+                                placeholderText: qsTr("Enter server IP (e.g. 192.168.0.220)")
+                                enabled: connectionSettingsExpander.modeComboCurrentIndex === 1
+                                validator: RegularExpressionValidator {
+                                    // IPv4用の簡易的な正規表現例
+                                    regularExpression: /^(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)\.(25[0-5]|2[0-4]\d|[01]?\d?\d)$/
+                                }
+                                font.pointSize: 16
+                                onTextChanged: {
+                                    connectionSettingsExpander.inputIpAddress = ipField.text
+                                }
                             }
                         }
                     },
                     Component {
                         // ポート入力フィールド (IntValidatorで範囲チェック)
-                        TextField {
-                            id: portField
-                            width: connectionSettingsExpander.engineModeRowWidth
-                            placeholderText: qsTr("Enter port (1-65535)")
-                            enabled: connectionSettingsExpander.modeComboCurrentIndex === 1
-                            validator: IntValidator {
-                                bottom: 1
-                                top: 65535
-                            }
-                            font.pointSize: 16
-                            onTextChanged: {
-                                connectionSettingsExpander.portNumber = portField.text
+                        RowLayout {
+                            width: connectionSettingsExpander.delegateWidth
+                            TextField {
+                                id: portField
+                                Layout.fillWidth: true
+                                placeholderText: qsTr("Enter port (1-65535)")
+                                enabled: connectionSettingsExpander.modeComboCurrentIndex === 1
+                                validator: IntValidator {
+                                    bottom: 1
+                                    top: 65535
+                                }
+                                font.pointSize: 16
+                                onTextChanged: {
+                                    connectionSettingsExpander.portNumber = portField.text
+                                }
                             }
                         }
                     },
@@ -272,6 +274,15 @@ ApplicationWindow {
                 property int currentLocaleIndex: 0
                 property list<string> allVoices: []
                 property int currentVoiceIndex: 0
+                property bool voiceRecognitionEnabled: false
+
+                onVoiceRecognitionEnabledChanged: {
+                    if(voiceRecognitionEnabled) {
+                        LlamaChatEngine.initiateVoiceRecognition()
+                    } else {
+                        LlamaChatEngine.stopVoiceRecognition()
+                    }
+                }
 
                 Connections {
                     target: LlamaChatEngine
@@ -374,6 +385,27 @@ ApplicationWindow {
                             width: voiceSettingsExpander.width
                             spacing: 8
                             Label {
+                                text: qsTr("Enable Voice Recognition")
+                                font.pointSize: 16
+                                Layout.alignment: Qt.AlignVCenter
+                                Layout.minimumWidth: voiceSettingsExpander.width * 0.3
+                            }
+                            Switch {
+                                id: voiceRecognitionSwitch
+                                enabled: tts.state === TextToSpeech.Ready
+                                Binding {
+                                    target: voiceSettingsExpander
+                                    property: "voiceRecognitionEnabled"
+                                    value: voiceRecognitionSwitch.checked
+                                }
+                            }
+                        }
+                    },
+                    Component {
+                        RowLayout {
+                            width: voiceSettingsExpander.width
+                            spacing: 8
+                            Label {
                                 text: qsTr("Engine:")
                                 font.pointSize: 16
                                 Layout.alignment: Qt.AlignVCenter
@@ -385,10 +417,23 @@ ApplicationWindow {
                                 font.pointSize: 16
                                 enabled: tts.state === TextToSpeech.Ready
                                 Component.onCompleted: {
-                                    tts.engine = textAt(currentIndex)
-                                    currentIndex = tts.availableEngines().indexOf(tts.engine)
-                                    tts.engine = textAt(currentIndex)
+                                    // 初期インデックスをセット
+                                    currentIndex = 0
+                                    // すでに tts.engine が "mock" になっていた場合は、
+                                    // このコンボボックスの先頭要素に差し替える
+                                    if (tts.engine === "mock" && model.length > 0) {
+                                        tts.engine = textAt(currentIndex)
+                                    } else {
+                                        // そうでなければ、現在のエンジンに合うindexに補正
+                                        currentIndex = model.indexOf(tts.engine)
+                                        // もし見つからない場合は0でOK
+                                        if (currentIndex === -1 && model.length > 0) {
+                                            currentIndex = 0
+                                            tts.engine = textAt(currentIndex)
+                                        }
+                                    }
                                 }
+
                                 onActivated: {
                                     tts.engine = textAt(currentIndex)
                                     voiceSettingsExpander.updateLocales()

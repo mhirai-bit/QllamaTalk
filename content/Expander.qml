@@ -8,6 +8,7 @@ Item {
 
     required property string title
     required property list<Component> model
+    readonly property int delegateWidth: width - expandingMenu.tabWidth
 
     height: mainRow.height + (internals.expanded ? expandingMenu.contentHeight : 0)
     width: mainRow.width + expandingMenu.tabWidth

@@ -55,9 +55,6 @@ LlamaChatEngine::LlamaChatEngine(QObject *parent)
         doEngineInit();
     });
 #endif
-
-    initVoiceRecognition();
-    startVoiceRecognition();
 }
 
 //------------------------------------------------------------------------------
@@ -432,17 +429,35 @@ void LlamaChatEngine::switchEngineMode(EngineMode newMode)
 
 void LlamaChatEngine::pauseVoiceDetection()
 {
+    if(!m_voiceDetector) {
+        qWarning() << "Voice detector not initialized.";
+        return;
+    }
     m_voiceDetector->pause();
 }
 
 void LlamaChatEngine::resumeVoiceDetection()
 {
+    if(!m_voiceDetector) {
+        qWarning() << "Voice detector not initialized.";
+        return;
+    }
     m_voiceDetector->resume();
 }
 
 void LlamaChatEngine::setVoiceRecognitionLanguage(const QString &language)
 {
+    if(!m_voiceRecognitionEngine) {
+        qWarning() << "Voice recognition engine not initialized.";
+        return;
+    }
     m_voiceRecognitionEngine->setLanguage(language);
+}
+
+void LlamaChatEngine::initiateVoiceRecognition()
+{
+    initVoiceRecognition();
+    startVoiceRecognition();
 }
 
 //------------------------------------------------------------------------------

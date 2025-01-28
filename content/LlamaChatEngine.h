@@ -130,6 +130,8 @@ public:
     Q_INVOKABLE void pauseVoiceDetection();
     Q_INVOKABLE void resumeVoiceDetection();
     Q_INVOKABLE void setVoiceRecognitionLanguage(const QString &language);
+    Q_INVOKABLE void initiateVoiceRecognition();
+    Q_INVOKABLE void stopVoiceRecognition();
 
     //--------------------------------------------------------------------------
     // QML-Exposed Getters / Setters (QMLに公開されるゲッター/セッター)
@@ -230,7 +232,6 @@ private:
 
     void initVoiceRecognition();
     void startVoiceRecognition();
-    void stopVoiceRecognition();
 
     //--------------------------------------------------------------------------
     // Constants (定数)
