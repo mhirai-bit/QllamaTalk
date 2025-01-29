@@ -165,7 +165,15 @@ if(ANDROID)
         endforeach()
     endif()
 
+    # whisper
+    add_library(whisper SHARED IMPORTED)
+    set_target_properties(whisper PROPERTIES
+        IMPORTED_LOCATION "${WHISPER_LIB_FILE_DIR}/libwhisper.so"
+        ANDROID_PACKAGE_SHARED_LIBS ON
+    )
+    target_link_libraries(QllamaTalkApp PRIVATE whisper)
+
     message(STATUS "IMPORTED llama => ${LLAMA_SO_PATH}")
     message(STATUS "IMPORTED ggml  => ${GGML_SO_PATHS}")
-
+    message(STATUS "IMPORTED whisper => ${WHISPER_LIB_FILE_DIR}/libwhisper.so")
 endif()

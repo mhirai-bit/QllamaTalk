@@ -32,6 +32,8 @@ Item {
         VectorImage {
             id: iconImage
             rotation: internals.expanded ? 90 : 0
+            height: mainRow.height
+            width: height
             Behavior on rotation {
                 RotationAnimation {
                     duration: 200
