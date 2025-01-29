@@ -101,6 +101,7 @@ void VoiceRecognitionEngine::processVadCheck()
         return;
     }
 
+    changeOperationPhaseTo(VadRunning);
     // 直近2秒分コピー
     const int sample_counts_for_VAD_check = COMMON_SAMPLE_RATE * 2;
     if (int(m_capturedAudio.size()) < sample_counts_for_VAD_check) return;
@@ -135,6 +136,7 @@ void VoiceRecognitionEngine::runWhisper(const std::vector<float> & audio_for_inf
 {
     if (!m_ctx) return;
 
+    changeOperationPhaseTo(WhisperRunning);
     // Whisper の推論パラメータを設定
     whisper_full_params wparams = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
     wparams.print_progress   = false;

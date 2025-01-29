@@ -400,6 +400,7 @@ void LlamaChatEngine::handle_new_user_input()
         return;
     }
 
+    setOperationPhase(LlamaRunning);
     LlamaChatMessage msg;
     msg.setRole(QStringLiteral("user"));
     msg.setContent(mUserInput);
@@ -491,6 +492,12 @@ void LlamaChatEngine::onGenerationFinished(const QString &finalResponse)
         EngineMode pending = *mPendingEngineSwitchMode;
         mPendingEngineSwitchMode.reset();
         doImmediateEngineSwitch(pending);
+    }
+
+    if(m_voiceDetector && m_voiceRecognitionEngine) {
+        setOperationPhase(Listening);
+    } else {
+        setOperationPhase(WaitingUserInput);
     }
 }
 
@@ -711,12 +718,18 @@ void LlamaChatEngine::initVoiceRecognition()
     // whisperが検知した言語が変わったらdetectedVoiceLocaleにセット
     connect(m_voiceRecognitionEngine, &VoiceRecognitionEngine::detectedVoiceLocaleChanged,
             this, &LlamaChatEngine::setDetectedVoiceLocale);
+    // オペレーションのフェーズ遷移シグナルの接続
+    connect(m_voiceRecognitionEngine, &VoiceRecognitionEngine::changeOperationPhaseTo,
+            this, &LlamaChatEngine::setOperationPhase);
 
     if (!m_voiceDetector) {
         m_voiceDetector = new VoiceDetector(vrParams.length_for_inference_ms, this);
         // VoiceDetectorが音声を取得したら voiceEngine->addAudio(...) へ渡す
         connect(m_voiceDetector, &VoiceDetector::audioAvailable,
                 m_voiceRecognitionEngine, &VoiceRecognitionEngine::addAudio);
+        // オペレーションのフェーズ遷移シングナルの接続
+        connect(m_voiceDetector, &VoiceDetector::changeOperationPhaseTo,
+                this, &LlamaChatEngine::setOperationPhase);
         // VoiceDetectorの初期化 (例: init(16kHz), start capturing, etc.)
         m_voiceDetector->init(/*sampleRate=*/COMMON_SAMPLE_RATE, /*channelCount=*/1);
     }
@@ -735,6 +748,24 @@ void LlamaChatEngine::startVoiceRecognition()
     }
 }
 
+OperationPhase LlamaChatEngine::operationPhase() const
+{
+    return m_operationPhase;
+}
+
+void LlamaChatEngine::setOperationPhase(OperationPhase newOperationPhase)
+{
+    if (m_operationPhase == newOperationPhase)
+        return;
+
+    if((m_operationPhase == LlamaRunning || m_operationPhase == Speaking) && (newOperationPhase != WaitingUserInput && newOperationPhase != Listening)) {
+        return;
+    }
+
+    m_operationPhase = newOperationPhase;
+    emit operationPhaseChanged();
+}
+
 void LlamaChatEngine::stopVoiceRecognition()
 {
     if (m_voiceDetector) {
@@ -743,6 +774,7 @@ void LlamaChatEngine::stopVoiceRecognition()
     if (m_voiceRecognitionEngine && m_voiceRecognitionEngine->isRunning()) {
         m_voiceRecognitionEngine->stop();
     }
+    setOperationPhase(WaitingUserInput);
 }
 
 void LlamaChatEngine::setDetectedVoiceLocale(const QLocale &newDetectedVoiceLocale)

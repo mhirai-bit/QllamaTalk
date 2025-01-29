@@ -119,6 +119,11 @@ ApplicationWindow {
                 height: connectionStatusLabel.height
                 width: height
             }
+
+            OperationPhaseIcon {
+                height: connectionStatusLabel.height
+                width: height
+            }
         }
 
         MouseArea {
@@ -142,6 +147,7 @@ ApplicationWindow {
             switch (state) {
                 case TextToSpeech.Ready:
                 LlamaChatEngine.resumeVoiceDetection()
+                LlamaChatEngine.operationPhase = 4 //LlamaChatEngine.WaitingUserInput
                 break
                 case TextToSpeech.Speaking:
                 break
@@ -158,6 +164,7 @@ ApplicationWindow {
             // 自分が読み上げたテキストを検知してしまわないように、voice detectionを一時的に止める
             LlamaChatEngine.pauseVoiceDetection()
             tts.say(text)
+            LlamaChatEngine.operationPhase = 5 //LlamaChatEngine.Speaking
         }
     }
 

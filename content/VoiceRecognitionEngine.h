@@ -6,6 +6,7 @@
 #include <QLocale>
 #include <vector>
 #include <string>
+#include "OperationPhase.h"
 
 struct whisper_context;
 
@@ -57,6 +58,7 @@ signals:
     void textRecognized(const QString & text);
 
     void detectedVoiceLocaleChanged(const QLocale&);
+    void changeOperationPhaseTo(OperationPhase newPhase);
 private slots:
     void processVadCheck();
 

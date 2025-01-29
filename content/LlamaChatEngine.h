@@ -2,17 +2,18 @@
 #define LLAMACHATENGINE_H
 
 #include <optional>
-#include <QObject>
 #include <QQmlEngine>
 #include <QRemoteObjectNode>
 #include <QThread>
 #include <QMetaObject>
+#include <QObject>
 #include "ChatMessageModel.h"
 #include "LlamaResponseGenerator.h"
 #include "rep_LlamaResponseGenerator_replica.h"
 #include "RemoteResponseGeneratorCompositor.h"
 #include "VoiceDetector.h"
 #include "VoiceRecognitionEngine.h"
+#include "OperationPhase.h"
 #include "llama.h"
 
 /*
@@ -105,6 +106,12 @@ class LlamaChatEngine : public QObject
                            NOTIFY detectedVoiceLocaleChanged
                            FINAL)
 
+    Q_PROPERTY(OperationPhase operationPhase
+                   READ operationPhase
+                       WRITE setOperationPhase
+                       NOTIFY operationPhaseChanged
+                           FINAL)
+
 public:
     //--------------------------------------------------------------------------
     // EngineMode Enum (エンジンモード列挙: ローカル/リモート/未初期化)
@@ -115,6 +122,7 @@ public:
         Mode_Uninitialized
     };
     Q_ENUM(EngineMode)
+    Q_ENUM(OperationPhase)
 
     //--------------------------------------------------------------------------
     // Constructor / Destructor
@@ -175,6 +183,9 @@ public:
 
     void setDetectedVoiceLocale(const QLocale &newDetectedVoiceLocale);
 
+    OperationPhase operationPhase() const;
+    void setOperationPhase(OperationPhase newOperationPhase);
+
 public slots:
     //--------------------------------------------------------------------------
     // Public Slots (外部/QMLなどから呼ばれる可能性のあるSlots)
@@ -202,6 +213,8 @@ signals:
     void modelDownloadInProgressChanged();
 
     void detectedVoiceLocaleChanged();
+
+    void operationPhaseChanged();
 
 private slots:
     //--------------------------------------------------------------------------
@@ -320,6 +333,8 @@ private:
     VoiceRecognitionEngine* m_voiceRecognitionEngine = nullptr;
     VoiceDetector*          m_voiceDetector = nullptr;
     QLocale                 m_detectedVoiceLocale;
+
+    OperationPhase          m_operationPhase = WaitingUserInput;
 
     // Additional helper connection setup/teardown
     void setupRemoteConnections();

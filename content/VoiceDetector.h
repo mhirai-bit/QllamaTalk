@@ -6,8 +6,8 @@
 #include <QByteArray>
 #include <QAudioFormat>
 #include <QIODevice>
-#include <atomic>
 #include <vector>
+#include "OperationPhase.h"
 
 /*
  * VoiceDetector (pull mode):
@@ -44,6 +44,7 @@ signals:
     // pull デバイスから読み取ったサンプルを通知
     // chunk.size() は今回受け取ったサンプル数
     void audioAvailable(const std::vector<float> & chunk);
+    void changeOperationPhaseTo(OperationPhase newPhase);
 
 private:
     bool m_running;   // 実行中フラグ

@@ -270,6 +270,7 @@ qt6_add_qml_module(content
         ChatView.qml
         ChatInputField.qml
         Expander.qml
+        OperationPhaseIcon.qml
     RESOURCES
         fonts/fonts.txt
         icons/online.svg
@@ -277,6 +278,12 @@ qt6_add_qml_module(content
         icons/local_error.svg
         icons/remote_error.svg
         icons/arrow.svg
+        icons/listening_phase.svg
+        icons/vad_running_phase.svg
+        icons/whisper_running_phase.svg
+        icons/llama_running_phase.svg
+        icons/waiting_user_input_phase.svg
+        icons/speaking_phase.svg
     SOURCES
         ChatMessageModel.cpp
         ChatMessageModel.h
@@ -298,6 +305,7 @@ qt6_add_qml_module(content
         common.h
         common.cpp
         dr_wav.h
+        OperationPhase.h
 )
 
 # ----------------------------------------------------------------------------
