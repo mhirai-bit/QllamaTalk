@@ -32,6 +32,7 @@ Item {
         VectorImage {
             id: iconImage
             rotation: internals.expanded ? 90 : 0
+            transformOrigin: Item.Center
             Behavior on rotation {
                 RotationAnimation {
                     duration: 200
@@ -44,6 +45,9 @@ Item {
                 onClicked: internals.expanded = !internals.expanded
             }
             Layout.alignment: Qt.AlignVCenter
+            Layout.preferredHeight: titleLabel.implicitHeight
+            Layout.preferredWidth: titleLabel.implicitHeight
+            fillMode: VectorImage.PreserveAspectFit
         }
     }
 
