@@ -82,7 +82,7 @@ void VoiceRecognitionEngine::stop()
 void VoiceRecognitionEngine::setLanguage(const QString &language) {
     std::string langStd = language.toStdString();
     // チェック
-    int langId = whisper_lang_id(langStd.c_str());
+    const int langId = whisper_lang_id(langStd.c_str());
     if (langId < 0) {
         qWarning() << "Invalid whisper language code:" << language;
         return; // or fallback
@@ -149,7 +149,7 @@ void VoiceRecognitionEngine::runWhisper(const std::vector<float> & audio_for_inf
     wparams.n_threads        = 4; // 適宜
 
     // 推論実行
-    int ret = whisper_full(m_ctx, wparams, audio_for_inference.data(), audio_for_inference.size());
+    const int ret = whisper_full(m_ctx, wparams, audio_for_inference.data(), audio_for_inference.size());
     if (ret != 0) {
         qWarning() << "[VoiceRecognitionEngine] whisper_full failed with code:" << ret;
         return;
@@ -158,11 +158,11 @@ void VoiceRecognitionEngine::runWhisper(const std::vector<float> & audio_for_inf
     // ■「自動言語検出」を使っている場合、Whisper が検出した言語IDを取得
     //   (もちろん "auto" 以外でも呼び出せますが、英語専用モデルなどでは正しく動作しない場合も)
     if (strcmp(m_whisper_params.language.c_str(), "auto") == 0) {
-        int detectedLangId = whisper_full_lang_id(m_ctx);  // -1 の場合は検出失敗
+        const int detectedLangId = whisper_full_lang_id(m_ctx);  // -1 の場合は検出失敗
         if (detectedLangId >= 0) {
             const char * detectedLangCode = whisper_lang_str(detectedLangId);
             // 必要であれば、検出言語をメンバ変数に保存するなど:
-            QLocale locale(QString::fromLatin1(detectedLangCode));
+            const QLocale locale(QString::fromLatin1(detectedLangCode));
             setDetectedVoiceLocale(locale);
         } else {
             qWarning() << "[VoiceRecognitionEngine] Failed to detect language.";

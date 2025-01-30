@@ -593,7 +593,7 @@ void LlamaChatEngine::downloadModelIfNeededAsync()
             this, &LlamaChatEngine::initAfterDownload);
 
     // (0) check if file already exists
-    QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    const QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     if (writableDir.isEmpty()) {
         qWarning() << "[downloadModelIfNeededAsync] No writable directory found!";
         QMetaObject::invokeMethod(this, [this](){
@@ -603,7 +603,7 @@ void LlamaChatEngine::downloadModelIfNeededAsync()
     }
     QDir().mkpath(writableDir);
 
-    QString localModelPath = writableDir + "/" + LLAMA_MODEL_FILE;
+    const QString localModelPath = writableDir + "/" + LLAMA_MODEL_FILE;
     if (QFile::exists(localModelPath)) {
         qDebug() << "[downloadModelIfNeededAsync] Model already exists:" << localModelPath;
         QMetaObject::invokeMethod(this, [this](){
@@ -617,7 +617,7 @@ void LlamaChatEngine::downloadModelIfNeededAsync()
                  << "to:" << localModelPath;
 
         QNetworkAccessManager manager;
-        QNetworkRequest request( QUrl(QStringLiteral( LLAMA_DOWNLOAD_URL )) );
+        const QNetworkRequest request( QUrl(QStringLiteral( LLAMA_DOWNLOAD_URL )) );
         QNetworkReply* reply = manager.get(request);
 
         connect(reply, &QNetworkReply::downloadProgress, this, [=](qint64 bytesReceived, qint64 bytesTotal) {
@@ -672,7 +672,7 @@ void LlamaChatEngine::downloadWhisperModelIfNeededAsync()
             this, &LlamaChatEngine::onWhisperDownloadFinished);
 
     // 2) すでにファイルが存在していればスキップ
-    QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    const QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     if (writableDir.isEmpty()) {
         qWarning() << "[downloadWhisperModelIfNeededAsync] No writable directory found!";
         emit whisperModelDownloadFinished(false);
@@ -680,7 +680,7 @@ void LlamaChatEngine::downloadWhisperModelIfNeededAsync()
     }
     QDir().mkpath(writableDir);
 
-    QString localModelPath = writableDir + "/" + WHISPER_MODEL_NAME;
+    const QString localModelPath = writableDir + "/" + WHISPER_MODEL_NAME;
     if (QFile::exists(localModelPath)) {
         qDebug() << "[downloadWhisperModelIfNeededAsync] Whisper model already exists:" << localModelPath;
         emit whisperModelDownloadFinished(true);
@@ -693,7 +693,7 @@ void LlamaChatEngine::downloadWhisperModelIfNeededAsync()
                  << "to:" << localModelPath;
 
         QNetworkAccessManager manager;
-        QNetworkRequest request(QUrl(QStringLiteral(WHISPER_DOWNLOAD_URL)));
+        const QNetworkRequest request(QUrl(QStringLiteral(WHISPER_DOWNLOAD_URL)));
         QNetworkReply* reply = manager.get(request);
 
         // ダウンロード進捗のハンドリング（必要ならUIに表示）
@@ -752,8 +752,8 @@ void LlamaChatEngine::onWhisperDownloadFinished(bool success)
         return;
     }
 
-    QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QString localModelPath = writableDir + "/" + WHISPER_MODEL_NAME;
+    const QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    const QString localModelPath = writableDir + "/" + WHISPER_MODEL_NAME;
 
     mWhisperModelPath = localModelPath.toStdString();
     mWhisperModelReady = true;
@@ -772,8 +772,8 @@ void LlamaChatEngine::initAfterDownload(bool success)
         return;
     }
 
-    QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QString localModelPath = writableDir + "/" + LLAMA_MODEL_FILE;
+    const QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    const QString localModelPath = writableDir + "/" + LLAMA_MODEL_FILE;
     std::string *ptr = const_cast<std::string*>(&mModelPath);
     *ptr = localModelPath.toStdString();
 

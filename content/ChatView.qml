@@ -147,7 +147,7 @@ Rectangle {
 
     Column {
         anchors.centerIn: parent
-        spacing: 12
+        spacing: 24
         ColumnLayout {
             id: modelDownloadProgressIndicator
             spacing: 8

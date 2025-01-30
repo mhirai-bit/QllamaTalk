@@ -35,15 +35,15 @@ public:
         }
 
         // AudioSource が実際に使用しているフォーマットを取得
-        QAudioFormat actualFormat = m_voice_detector->m_audioSource->format();
-        QAudioFormat::SampleFormat sf = actualFormat.sampleFormat();
+        const QAudioFormat actualFormat = m_voice_detector->m_audioSource->format();
+        const QAudioFormat::SampleFormat sf = actualFormat.sampleFormat();
 
         std::vector<float> chunkVec;  // ここに float 値として格納する
 
         switch (sf) {
         case QAudioFormat::Float: {
             // 既存のとおり float として解釈
-            size_t sample_counts = static_cast<size_t>(data_len_in_bytes / sizeof(float));
+            const size_t sample_counts = static_cast<size_t>(data_len_in_bytes / sizeof(float));
             chunkVec.resize(sample_counts);
 
             const float *audio_samples = reinterpret_cast<const float*>(data);
@@ -54,7 +54,7 @@ public:
         }
         case QAudioFormat::Int16: {
             // int16_t として解釈 → float に変換
-            size_t sample_counts = static_cast<size_t>(data_len_in_bytes / sizeof(qint16));
+            const size_t sample_counts = static_cast<size_t>(data_len_in_bytes / sizeof(qint16));
             chunkVec.resize(sample_counts);
 
             const qint16 *audio_samples = reinterpret_cast<const qint16*>(data);
@@ -66,7 +66,7 @@ public:
         }
         case QAudioFormat::Int32: {
             // int32_t → float
-            size_t sample_counts = static_cast<size_t>(data_len_in_bytes / sizeof(qint32));
+            const size_t sample_counts = static_cast<size_t>(data_len_in_bytes / sizeof(qint32));
             chunkVec.resize(sample_counts);
 
             const qint32 *audio_samples = reinterpret_cast<const qint32*>(data);
@@ -131,7 +131,7 @@ bool VoiceDetector::init(int sampleRate, int channelCount)
     m_sample_rate = sampleRate;
 
     // 1) デバイス取得
-    QAudioDevice device = QMediaDevices::defaultAudioInput();
+    const QAudioDevice device = QMediaDevices::defaultAudioInput();
     if (!device.isNull()) {
         qDebug() << "[VoiceDetector] default audio input device:"
                  << device.description();
