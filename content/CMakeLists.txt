@@ -331,6 +331,7 @@ target_link_libraries(content PRIVATE
     Qt6::RemoteObjects
     Qt6::WebSockets
     Qt6::Multimedia
+    Qt6::TextToSpeech
 )
 
 if(NOT ANDROID)
