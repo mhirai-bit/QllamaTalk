@@ -132,16 +132,16 @@ Rectangle {
         BusyIndicator {
             visible: root.isRemote ? !LlamaChatEngine.remoteInitialized : !LlamaChatEngine.localInitialized
             running: visible
-
+            Layout.alignment: Qt.AlignHCenter
         }
 
         Label {
             id: loadingText
-            anchors.horizontalCenter: parent.horizontalCenter
             text: qsTr("Loading AI...")
             visible: root.isRemote ? !LlamaChatEngine.remoteInitialized : !LlamaChatEngine.localInitialized
             color: "#f3f3f4"
             font.pointSize: 14
+            Layout.alignment: Qt.AlignHCenter
         }
     }
 

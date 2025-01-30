@@ -642,7 +642,7 @@ void LlamaChatEngine::downloadModelIfNeededAsync()
             qWarning() << "[downloadModelIfNeededAsync] Download error:" << reply->errorString();
             success = false;
         } else {
-            QByteArray data = reply->readAll();
+            const QByteArray data = reply->readAll();
             QFile outFile(localModelPath);
             if (!outFile.open(QIODevice::WriteOnly)) {
                 qWarning() << "[downloadModelIfNeededAsync] Failed to open for writing:" << localModelPath;
@@ -719,7 +719,7 @@ void LlamaChatEngine::downloadWhisperModelIfNeededAsync()
             qWarning() << "[downloadWhisperModelIfNeededAsync] Download error:" << reply->errorString();
             success = false;
         } else {
-            QByteArray data = reply->readAll();
+            const QByteArray data = reply->readAll();
             QFile outFile(localModelPath);
             if (!outFile.open(QIODevice::WriteOnly)) {
                 qWarning() << "[downloadWhisperModelIfNeededAsync] Failed to open for writing:" << localModelPath;
