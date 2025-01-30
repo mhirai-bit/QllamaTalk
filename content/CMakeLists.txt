@@ -15,6 +15,7 @@ target_compile_definitions(content PRIVATE
     LLAMA_MODEL_FILE=\"${LLAMA_MODEL_NAME}\"
     LLAMA_DOWNLOAD_URL=\"${LLAMA_DOWNLOAD_URL}\"
     WHISPER_MODEL_NAME=\"${WHISPER_MODEL_NAME}\"
+    WHISPER_DOWNLOAD_URL=\"${WHISPER_DOWNLOAD_URL}\"
 )
 
 message(STATUS "Check: listing directory = ${LLAMA_LIB_FILE_DIR}")

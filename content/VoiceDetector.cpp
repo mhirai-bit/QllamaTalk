@@ -29,29 +29,67 @@ public:
         return 0;
     }
     qint64 writeData(const char *data, qint64 data_len_in_bytes) override {
-        // ここでオーディオデータを受け取る
         // もし VoiceDetector が停止中ならすぐ返す
         if (!m_voice_detector->m_running) {
             return data_len_in_bytes; // 受け取るだけ受け取って破棄
         }
 
-        // データを float として解釈
-        //   preferredFormat() が Int16 などの場合は自前で変換が必要 (省略)
-        //   ここでは Float前提で進める例に
-        size_t sample_counts = static_cast<size_t>(data_len_in_bytes / sizeof(float));
-        const float *audio_samples = reinterpret_cast<const float*>(data);
+        // AudioSource が実際に使用しているフォーマットを取得
+        QAudioFormat actualFormat = m_voice_detector->m_audioSource->format();
+        QAudioFormat::SampleFormat sf = actualFormat.sampleFormat();
 
-        // 1) シグナル発行用のベクタを確保
-        std::vector<float> chunkVec(sample_counts);
-        for (size_t i = 0; i < sample_counts; i++) {
-            chunkVec[i] = audio_samples[i];
+        std::vector<float> chunkVec;  // ここに float 値として格納する
+
+        switch (sf) {
+        case QAudioFormat::Float: {
+            // 既存のとおり float として解釈
+            size_t sample_counts = static_cast<size_t>(data_len_in_bytes / sizeof(float));
+            chunkVec.resize(sample_counts);
+
+            const float *audio_samples = reinterpret_cast<const float*>(data);
+            for (size_t i = 0; i < sample_counts; i++) {
+                chunkVec[i] = audio_samples[i];
+            }
+            break;
+        }
+        case QAudioFormat::Int16: {
+            // int16_t として解釈 → float に変換
+            size_t sample_counts = static_cast<size_t>(data_len_in_bytes / sizeof(qint16));
+            chunkVec.resize(sample_counts);
+
+            const qint16 *audio_samples = reinterpret_cast<const qint16*>(data);
+            for (size_t i = 0; i < sample_counts; i++) {
+                // 32768.0f で割ることで [-1.0f, +1.0f] 程度の浮動小数に変換
+                chunkVec[i] = static_cast<float>(audio_samples[i]) / 32768.0f;
+            }
+            break;
+        }
+        case QAudioFormat::Int32: {
+            // int32_t → float
+            size_t sample_counts = static_cast<size_t>(data_len_in_bytes / sizeof(qint32));
+            chunkVec.resize(sample_counts);
+
+            const qint32 *audio_samples = reinterpret_cast<const qint32*>(data);
+            // float への正規化の仕方は int32 の場合スケールが 2^31 (約2.147e9)
+            constexpr float kMaxInt32Inv = 1.0f / 2147483648.0f;
+            for (size_t i = 0; i < sample_counts; i++) {
+                chunkVec[i] = static_cast<float>(audio_samples[i]) * kMaxInt32Inv;
+            }
+            break;
+        }
+        // もし他のフォーマット (UInt8など) が来る場合は追加
+        default:
+            // このフォーマットには対応していない or 実装していないので無視
+            qWarning() << "[VoicePullIODevice] Unsupported sampleFormat" << sf;
+            return data_len_in_bytes;
         }
 
-        // 2) シグナル送信
+        // 変換後 chunkVec を送信
         emit m_voice_detector->audioAvailable(chunkVec);
 
         return data_len_in_bytes;
     }
+
 
 private:
     VoiceDetector *m_voice_detector = nullptr;
@@ -99,29 +137,43 @@ bool VoiceDetector::init(int sampleRate, int channelCount)
                  << device.description();
     }
 
-    // 2) QAudioFormat: サンプルフォーマットに Float を優先
-    QAudioFormat format;
-    format.setSampleRate(m_sample_rate);
-    format.setChannelCount(channelCount);
-    format.setSampleFormat(QAudioFormat::Float);
+    // 2) まずは「Float + ユーザー指定のsampleRate/channelCount」で試みる
+    QAudioFormat formatWanted;
+    formatWanted.setSampleRate(m_sample_rate);
+    formatWanted.setChannelCount(channelCount);
+    formatWanted.setSampleFormat(QAudioFormat::Float);
 
-    // 3) Float形式がサポートされるかチェック
-    if (!device.isFormatSupported(format)) {
-        // サポートされない → エラーを出力し、プログラム終了
-        qCritical() << "[VoiceDetector] Error: Float format is NOT supported by the device!"
-                    << "sampleRate=" << m_sample_rate
-                    << "ch=" << channelCount;
-        return false;
+    // 3) サポートチェック
+    if (!device.isFormatSupported(formatWanted)) {
+        // Floatがサポートされない場合 → デバイスの preferredFormat にフォールバック
+        qDebug() << "[VoiceDetector] Float format is NOT supported. Fallback to device's preferred format.";
+
+        QAudioFormat preferred = device.preferredFormat();
+        // 必要に応じてチャンネル数やサンプルレートを自分で上書きするか、
+        // デバイス推奨のまま使うかは要検討 (ここでは sampleRate, channelCount を上書き例に)
+        preferred.setSampleRate(m_sample_rate);
+        preferred.setChannelCount(channelCount);
+
+        // それでもサポートされない場合は仕方がないので device.preferredFormat() をまるごと受け入れる
+        if (!device.isFormatSupported(preferred)) {
+            qWarning() << "[VoiceDetector] Even the adjusted preferred format is not fully supported.";
+            qWarning() << "[VoiceDetector] preferredFormat.sampleFormat=" << preferred.sampleFormat()
+                       << " sampleRate=" << preferred.sampleRate()
+                       << " channelCount=" << preferred.channelCount();
+            qFatal("Cannot proceed.");
+        }
+
+        formatWanted = preferred;
     }
 
-    // 4) QAudioSourceの生成（pullモード前提）
-    m_audioSource = new QAudioSource(device, format, this);
+    // 4) QAudioSource生成
+    m_audioSource = new QAudioSource(device, formatWanted, this);
     if (!m_audioSource) {
         qWarning() << "[VoiceDetector] Failed to create QAudioSource";
         return false;
     }
 
-    // 5) pullモード用の QIODevice を作成 (例: VoicePullIODevice)
+    // 5) pullモード用の QIODevice を作成
     m_pullDevice = new VoicePullIODevice(this, this);
     if (!m_pullDevice->open(QIODevice::WriteOnly)) {
         qWarning() << "[VoiceDetector] Failed to open pullDevice";
@@ -143,9 +195,13 @@ bool VoiceDetector::init(int sampleRate, int channelCount)
             });
 
     m_initialized = true;
-    qDebug() << "[VoiceDetector] init done. m_audioSource state =" << m_audioSource->state();
+    qDebug() << "[VoiceDetector] init done. m_audioSource state =" << m_audioSource->state()
+             << " format.sampleFormat=" << m_audioSource->format().sampleFormat()
+             << " sampleRate=" << m_audioSource->format().sampleRate()
+             << " channelCount=" << m_audioSource->format().channelCount();
     return true;
 }
+
 
 
 bool VoiceDetector::resume()

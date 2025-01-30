@@ -23,6 +23,9 @@
 #ifdef Q_OS_ANDROID
 // Android では最初は空文字にする (実際のパスは initializeModelPathForAndroid() で決める)
 const std::string LlamaChatEngine::mModelPath {""};
+#ifndef WHISPER_DOWNLOAD_URL
+#warning "WHISPER_DOWNLOAD_URL is not defined. Make sure to define it in CMake."
+#endif
 #else
 // Windows/macOS/Linux/iOSなどの例 (従来通り)
 const std::string LlamaChatEngine::mModelPath {
@@ -564,14 +567,21 @@ bool LlamaChatEngine::initializeModelPathForAndroid()
 #endif
 
 #ifdef LLAMA_DOWNLOAD_URL
-    downloadModelIfNeededAsync();
+    downloadModelIfNeededAsync(); // ← LLaMAモデルのダウンロード
 #else
     qWarning() << "LLAMA_DOWNLOAD_URL is not defined. Cannot proceed.";
     return false;
 #endif
 
+#ifdef WHISPER_DOWNLOAD_URL
+    downloadWhisperModelIfNeededAsync(); // ← Whisperモデルのダウンロード
+#else
+    qWarning() << "WHISPER_DOWNLOAD_URL is not defined. Cannot proceed.";
+#endif
+
     return true;
 }
+
 
 //------------------------------------------------------------------------------
 // downloadModelIfNeededAsync
@@ -654,6 +664,103 @@ void LlamaChatEngine::downloadModelIfNeededAsync()
     setModelDownloadInProgress(true);
 }
 
+
+void LlamaChatEngine::downloadWhisperModelIfNeededAsync()
+{
+    // 1) コールバックをつないでおく
+    connect(this, &LlamaChatEngine::whisperModelDownloadFinished,
+            this, &LlamaChatEngine::onWhisperDownloadFinished);
+
+    // 2) すでにファイルが存在していればスキップ
+    QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (writableDir.isEmpty()) {
+        qWarning() << "[downloadWhisperModelIfNeededAsync] No writable directory found!";
+        emit whisperModelDownloadFinished(false);
+        return;
+    }
+    QDir().mkpath(writableDir);
+
+    QString localModelPath = writableDir + "/" + WHISPER_MODEL_NAME;
+    if (QFile::exists(localModelPath)) {
+        qDebug() << "[downloadWhisperModelIfNeededAsync] Whisper model already exists:" << localModelPath;
+        emit whisperModelDownloadFinished(true);
+        return;
+    }
+
+    // 3) ダウンロード用タスク
+    auto task = [=]() {
+        qDebug() << "[downloadWhisperModelIfNeededAsync] Downloading from:" << WHISPER_DOWNLOAD_URL
+                 << "to:" << localModelPath;
+
+        QNetworkAccessManager manager;
+        QNetworkRequest request(QUrl(QStringLiteral(WHISPER_DOWNLOAD_URL)));
+        QNetworkReply* reply = manager.get(request);
+
+        // ダウンロード進捗のハンドリング（必要ならUIに表示）
+        connect(reply, &QNetworkReply::downloadProgress, this, [=](qint64 bytesReceived, qint64 bytesTotal){
+            if (bytesTotal > 0) {
+                double progress = static_cast<double>(bytesReceived) / static_cast<double>(bytesTotal);
+                mWhisperModelDownloadProgress = progress;
+                QMetaObject::invokeMethod(this, [this]() {
+                    emit whisperModelDownloadProgressChanged();
+                    qDebug() << "[downloadWhisperModelIfNeededAsync] Progress:" << mWhisperModelDownloadProgress;
+                }, Qt::QueuedConnection);
+            }
+        });
+
+        // 同期的に待機 (スレッドプール上で)
+        QEventLoop loop;
+        connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+        loop.exec();
+
+        bool success = true;
+        setWhisperModelDownloadInProgress(false);
+        if (reply->error() != QNetworkReply::NoError) {
+            qWarning() << "[downloadWhisperModelIfNeededAsync] Download error:" << reply->errorString();
+            success = false;
+        } else {
+            QByteArray data = reply->readAll();
+            QFile outFile(localModelPath);
+            if (!outFile.open(QIODevice::WriteOnly)) {
+                qWarning() << "[downloadWhisperModelIfNeededAsync] Failed to open for writing:" << localModelPath;
+                success = false;
+            } else {
+                outFile.write(data);
+                outFile.close();
+                qDebug() << "[downloadWhisperModelIfNeededAsync] Whisper model saved to:" << localModelPath;
+            }
+        }
+        reply->deleteLater();
+
+        // メインスレッドに結果を返す
+        QMetaObject::invokeMethod(this, [this, success]() {
+            emit whisperModelDownloadFinished(success);
+        }, Qt::QueuedConnection);
+    };
+
+    // 4) タスクをスレッドプールで実行
+    QThreadPool::globalInstance()->start(task);
+    setWhisperModelDownloadInProgress(true);
+}
+
+// ダウンロード完了ハンドラ
+void LlamaChatEngine::onWhisperDownloadFinished(bool success)
+{
+    if (!success) {
+        qWarning() << "[onWhisperDownloadFinished] Whisper model download failed, cannot proceed.";
+        // 必要に応じてフラグを立てる/ユーザにリトライ促す etc.
+        return;
+    }
+
+    QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QString localModelPath = writableDir + "/" + WHISPER_MODEL_NAME;
+
+    mWhisperModelPath = localModelPath.toStdString();
+    mWhisperModelReady = true;
+
+    qDebug() << "[onWhisperDownloadFinished] Whisper model is ready at" << localModelPath;
+}
+
 //------------------------------------------------------------------------------
 // initAfterDownload
 // ダウンロード完了後に呼ばれるスロット
@@ -700,7 +807,11 @@ void LlamaChatEngine::initVoiceRecognition()
     // Whisper設定
     VoiceRecParams vrParams;
     vrParams.language = "auto";
+#ifdef Q_OS_ANDROID
+    vrParams.model   = mWhisperModelPath;
+#else
     vrParams.model    = WHISPER_MODEL_NAME;
+#endif
     vrParams.length_for_inference_ms  = 10000;  // 10秒取りたい
     vrParams.vad_thold  = 0.6f;
     vrParams.freq_thold = 100.0f;
@@ -746,6 +857,32 @@ void LlamaChatEngine::startVoiceRecognition()
         // VoiceRecognitionEngineスタート
         m_voiceRecognitionEngine->start();
     }
+}
+
+bool LlamaChatEngine::whisperModelDownloadInProgress() const
+{
+    return mWhisperModelDownloadInProgress;
+}
+
+void LlamaChatEngine::setWhisperModelDownloadInProgress(bool newWhisperModelDownloadInProgress)
+{
+    if (mWhisperModelDownloadInProgress == newWhisperModelDownloadInProgress)
+        return;
+    mWhisperModelDownloadInProgress = newWhisperModelDownloadInProgress;
+    emit whisperModelDownloadInProgressChanged();
+}
+
+double LlamaChatEngine::whisperModelDownloadProgress() const
+{
+    return mWhisperModelDownloadProgress;
+}
+
+void LlamaChatEngine::setWhisperModelDownloadProgress(double newWhisperModelDownloadProgress)
+{
+    if (qFuzzyCompare(mWhisperModelDownloadProgress, newWhisperModelDownloadProgress))
+        return;
+    mWhisperModelDownloadProgress = newWhisperModelDownloadProgress;
+    emit whisperModelDownloadProgressChanged();
 }
 
 OperationPhase LlamaChatEngine::operationPhase() const

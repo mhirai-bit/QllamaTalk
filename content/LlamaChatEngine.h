@@ -111,6 +111,8 @@ class LlamaChatEngine : public QObject
                        WRITE setOperationPhase
                        NOTIFY operationPhaseChanged
                            FINAL)
+    Q_PROPERTY(double whisperModelDownloadProgress READ whisperModelDownloadProgress NOTIFY whisperModelDownloadProgressChanged FINAL)
+    Q_PROPERTY(bool whisperModelDownloadInProgress READ whisperModelDownloadInProgress NOTIFY whisperModelDownloadInProgressChanged FINAL)
 
 public:
     //--------------------------------------------------------------------------
@@ -186,6 +188,12 @@ public:
     OperationPhase operationPhase() const;
     void setOperationPhase(OperationPhase newOperationPhase);
 
+    double whisperModelDownloadProgress() const;
+    void setWhisperModelDownloadProgress(double newWhisperModelDownloadProgress);
+
+    bool whisperModelDownloadInProgress() const;
+    void setWhisperModelDownloadInProgress(bool newWhisperModelDownloadInProgress);
+
 public slots:
     //--------------------------------------------------------------------------
     // Public Slots (外部/QMLなどから呼ばれる可能性のあるSlots)
@@ -215,6 +223,11 @@ signals:
     void detectedVoiceLocaleChanged();
 
     void operationPhaseChanged();
+    void whisperModelDownloadFinished(bool success);
+
+    void whisperModelDownloadProgressChanged();
+
+    void whisperModelDownloadInProgressChanged();
 
 private slots:
     //--------------------------------------------------------------------------
@@ -259,6 +272,13 @@ private:
     // modelをランタイムでダウンロードする際の進捗
     double mModelDownloadProgress {0.0};
     bool   mModelDownloadInProgress {false};
+    double mWhisperModelDownloadProgress {0.0};
+    bool   mWhisperModelDownloadInProgress {false};
+
+    std::string mWhisperModelPath;
+    bool mWhisperModelReady { false };
+    void downloadWhisperModelIfNeededAsync();
+    void onWhisperDownloadFinished(bool success);
 
     //--------------------------------------------------------------------------
     // LLaMA Model / Context (LLaMAモデル/コンテキスト)
