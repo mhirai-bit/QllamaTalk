@@ -36,81 +36,20 @@ class LlamaChatEngine : public QObject
     //--------------------------------------------------------------------------
     // QML Properties (QMLプロパティ)
     //--------------------------------------------------------------------------
-    Q_PROPERTY(ChatMessageModel* messages
-                   READ messages
-                       CONSTANT)
-
-    Q_PROPERTY(QString userInput
-                   READ userInput
-                       WRITE setUserInput
-                           RESET resetUserInput
-                               NOTIFY userInputChanged
-                                   FINAL)
-
-    Q_PROPERTY(EngineMode currentEngineMode
-                   READ currentEngineMode
-                       NOTIFY currentEngineModeChanged
-                           FINAL)
-
-    Q_PROPERTY(QString ipAddress
-                   READ ipAddress
-                       WRITE setIpAddress
-                           NOTIFY ipAddressChanged
-                               FINAL)
-
-    Q_PROPERTY(int portNumber
-                   READ portNumber
-                       WRITE setPortNumber
-                           NOTIFY portNumberChanged
-                               FINAL)
-
-    Q_PROPERTY(bool localInitialized
-                   READ localInitialized
-                       WRITE setLocalInitialized
-                           NOTIFY localInitializedChanged
-                               FINAL)
-
-    Q_PROPERTY(bool remoteInitialized
-                   READ remoteInitialized
-                       WRITE setRemoteInitialized
-                           NOTIFY remoteInitializedChanged
-                               FINAL)
-
-    Q_PROPERTY(bool remoteAiInError
-                   READ remoteAiInError
-                       NOTIFY remoteAiInErrorChanged
-                           FINAL)
-
-    Q_PROPERTY(bool localAiInError
-                   READ localAiInError
-                       NOTIFY localAiInErrorChanged
-                           FINAL)
-
-    Q_PROPERTY(bool inProgress
-                   READ inProgress
-                       NOTIFY inProgressChanged
-                           FINAL)
-
-    Q_PROPERTY(double modelDownloadProgress
-                   READ modelDownloadProgress
-                       NOTIFY modelDownloadProgressChanged
-                           FINAL)
-
-    Q_PROPERTY(bool modelDownloadInProgress
-                   READ modelDownloadInProgress
-                       NOTIFY modelDownloadInProgressChanged
-                           FINAL)
-
-    Q_PROPERTY(QLocale detectedVoiceLocale
-                   READ detectedVoiceLocale
-                           NOTIFY detectedVoiceLocaleChanged
-                           FINAL)
-
-    Q_PROPERTY(OperationPhase operationPhase
-                   READ operationPhase
-                       WRITE setOperationPhase
-                       NOTIFY operationPhaseChanged
-                           FINAL)
+    Q_PROPERTY(ChatMessageModel* messages READ messages CONSTANT)
+    Q_PROPERTY(QString userInput READ userInput WRITE setUserInput RESET resetUserInput NOTIFY userInputChanged FINAL)
+    Q_PROPERTY(EngineMode currentEngineMode READ currentEngineMode NOTIFY currentEngineModeChanged FINAL)
+    Q_PROPERTY(QString ipAddress READ ipAddress WRITE setIpAddress NOTIFY ipAddressChanged FINAL)
+    Q_PROPERTY(int portNumber READ portNumber WRITE setPortNumber NOTIFY portNumberChanged FINAL)
+    Q_PROPERTY(bool localInitialized READ localInitialized WRITE setLocalInitialized NOTIFY localInitializedChanged FINAL)
+    Q_PROPERTY(bool remoteInitialized READ remoteInitialized WRITE setRemoteInitialized NOTIFY remoteInitializedChanged FINAL)
+    Q_PROPERTY(bool remoteAiInError READ remoteAiInError NOTIFY remoteAiInErrorChanged FINAL)
+    Q_PROPERTY(bool localAiInError READ localAiInError NOTIFY localAiInErrorChanged FINAL)
+    Q_PROPERTY(bool inProgress READ inProgress NOTIFY inProgressChanged FINAL)
+    Q_PROPERTY(double modelDownloadProgress READ modelDownloadProgress NOTIFY modelDownloadProgressChanged FINAL)
+    Q_PROPERTY(bool modelDownloadInProgress READ modelDownloadInProgress NOTIFY modelDownloadInProgressChanged FINAL)
+    Q_PROPERTY(QLocale detectedVoiceLocale READ detectedVoiceLocale NOTIFY detectedVoiceLocaleChanged FINAL)
+    Q_PROPERTY(OperationPhase operationPhase READ operationPhase WRITE setOperationPhase NOTIFY operationPhaseChanged FINAL)
     Q_PROPERTY(double whisperModelDownloadProgress READ whisperModelDownloadProgress NOTIFY whisperModelDownloadProgressChanged FINAL)
     Q_PROPERTY(bool whisperModelDownloadInProgress READ whisperModelDownloadInProgress NOTIFY whisperModelDownloadInProgressChanged FINAL)
 
@@ -124,6 +63,10 @@ public:
         Mode_Uninitialized
     };
     Q_ENUM(EngineMode)
+
+    //--------------------------------------------------------------------------
+    // OperationPhase Enum (オペレーションフェーズ列挙: 現在実行中の処理フェーズを示す)
+    //--------------------------------------------------------------------------
     Q_ENUM(OperationPhase)
 
     //--------------------------------------------------------------------------
@@ -194,12 +137,6 @@ public:
     bool whisperModelDownloadInProgress() const;
     void setWhisperModelDownloadInProgress(bool newWhisperModelDownloadInProgress);
 
-public slots:
-    //--------------------------------------------------------------------------
-    // Public Slots (外部/QMLなどから呼ばれる可能性のあるSlots)
-    //--------------------------------------------------------------------------
-    void handle_new_user_input();
-
 signals:
     //--------------------------------------------------------------------------
     // Signals (シグナル)
@@ -240,6 +177,7 @@ private slots:
     void reinitLocalEngine();
     void initAfterDownload(bool success);
     void handleRecognizedText(const QString &text);
+    void handleNewUserInput();
 
 private:
     //--------------------------------------------------------------------------

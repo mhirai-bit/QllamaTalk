@@ -214,7 +214,7 @@ void LlamaChatEngine::setupCommonConnections()
     teardownCommonConnections();
     mHandleNewUserInputConnection = connect(
         this, &LlamaChatEngine::userInputChanged,
-        this, &LlamaChatEngine::handle_new_user_input
+        this, &LlamaChatEngine::handleNewUserInput
         );
     qDebug() << "[setupCommonConnections] Common connections established.";
 }
@@ -389,10 +389,10 @@ void LlamaChatEngine::setupRemoteConnections()
 }
 
 //------------------------------------------------------------------------------
-// handle_new_user_input
+// handleNewUserInput
 // ユーザー入力を処理し、requestGenerationをemit
 //------------------------------------------------------------------------------
-void LlamaChatEngine::handle_new_user_input()
+void LlamaChatEngine::handleNewUserInput()
 {
     if (mInProgress) {
         qDebug() << "Generation in progress, ignoring new input.";
