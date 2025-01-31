@@ -142,28 +142,24 @@ signals:
     // Signals (シグナル)
     //--------------------------------------------------------------------------
     void userInputChanged();
-    void requestGeneration(const QList<LlamaChatMessage>& messages);
-    void generationFinishedToQML(const QString& finalResponse);
     void currentEngineModeChanged();
     void ipAddressChanged();
     void portNumberChanged();
     void localInitializedChanged();
     void remoteInitializedChanged();
-    void inferenceErrorToQML(const QString &errorMessage);
     void remoteAiInErrorChanged();
     void localAiInErrorChanged();
     void inProgressChanged();
-    void modelDownloadFinished(bool success);
     void modelDownloadProgressChanged();
     void modelDownloadInProgressChanged();
-
     void detectedVoiceLocaleChanged();
-
     void operationPhaseChanged();
+    void requestGeneration(const QList<LlamaChatMessage>& messages);
+    void generationFinishedToQML(const QString& finalResponse);
+    void inferenceErrorToQML(const QString &errorMessage);
+    void modelDownloadFinished(bool success);
     void whisperModelDownloadFinished(bool success);
-
     void whisperModelDownloadProgressChanged();
-
     void whisperModelDownloadInProgressChanged();
 
 private slots:
