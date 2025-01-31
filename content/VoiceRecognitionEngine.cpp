@@ -5,7 +5,6 @@
 #include <QDebug>
 #include <QThread>
 #include <cstring>
-#include <chrono>
 
 VoiceRecognitionEngine::VoiceRecognitionEngine(QObject *parent)
     : QObject(parent)

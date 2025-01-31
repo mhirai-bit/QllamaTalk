@@ -797,6 +797,24 @@ void LlamaChatEngine::setCurrentEngineMode(EngineMode newCurrentEngineMode)
 
 void LlamaChatEngine::initVoiceRecognition()
 {
+    // すでに存在しているならクリーンアップする
+    if (m_voiceDetectorThread) {
+        m_voiceDetectorThread->quit();
+        m_voiceDetectorThread->wait();
+        m_voiceDetectorThread->deleteLater();
+        m_voiceDetectorThread = nullptr;
+    }
+
+    if (m_voiceRecognitionThread) {
+        m_voiceRecognitionThread->quit();
+        m_voiceRecognitionThread->wait();
+        m_voiceRecognitionThread->deleteLater();
+        m_voiceRecognitionThread = nullptr;
+    }
+
+    m_voiceDetectorThread = new QThread(this);
+    m_voiceRecognitionThread = new QThread(this);
+
     if (m_voiceRecognitionEngine) {
         // すでに作ってたら再初期化など
         delete m_voiceRecognitionEngine;
@@ -852,12 +870,51 @@ void LlamaChatEngine::startVoiceRecognition()
         initVoiceRecognition();
     }
     if (m_voiceDetector && !m_voiceRecognitionEngine->isRunning()) {
+        m_voiceDetector->setParent(nullptr);
+        m_voiceDetector->moveToThread(m_voiceDetectorThread);
+        connect(m_voiceDetectorThread, &QThread::finished,
+                m_voiceDetector, &QObject::deleteLater);
+        m_voiceDetectorThread->start();
         // VoiceDetectorスタート
-        m_voiceDetector->resume();   // or start capturing
+        QMetaObject::invokeMethod(
+            m_voiceDetector,
+            "resume",
+            Qt::QueuedConnection
+            );
+
+        m_voiceRecognitionEngine->setParent(nullptr);
+        m_voiceRecognitionEngine->moveToThread(m_voiceRecognitionThread);
+        connect(m_voiceRecognitionThread, &QThread::finished,
+                m_voiceRecognitionEngine, &QObject::deleteLater);
+        m_voiceRecognitionThread->start();
         // VoiceRecognitionEngineスタート
-        m_voiceRecognitionEngine->start();
+        QMetaObject::invokeMethod(
+            m_voiceRecognitionEngine,
+            "start",
+            Qt::QueuedConnection
+            );
     }
 }
+
+void LlamaChatEngine::stopVoiceRecognition()
+{
+    if (m_voiceDetector) {
+        QMetaObject::invokeMethod(
+            m_voiceDetector,
+            "pause",
+            Qt::QueuedConnection
+            );
+    }
+    if (m_voiceRecognitionEngine && m_voiceRecognitionEngine->isRunning()) {
+        QMetaObject::invokeMethod(
+            m_voiceRecognitionEngine,
+            "stop",
+            Qt::QueuedConnection
+            );
+    }
+    setOperationPhase(WaitingUserInput);
+}
+
 
 bool LlamaChatEngine::whisperModelDownloadInProgress() const
 {
@@ -901,17 +958,6 @@ void LlamaChatEngine::setOperationPhase(OperationPhase newOperationPhase)
 
     m_operationPhase = newOperationPhase;
     emit operationPhaseChanged();
-}
-
-void LlamaChatEngine::stopVoiceRecognition()
-{
-    if (m_voiceDetector) {
-        m_voiceDetector->pause(); // or stop
-    }
-    if (m_voiceRecognitionEngine && m_voiceRecognitionEngine->isRunning()) {
-        m_voiceRecognitionEngine->stop();
-    }
-    setOperationPhase(WaitingUserInput);
 }
 
 void LlamaChatEngine::setDetectedVoiceLocale(const QLocale &newDetectedVoiceLocale)

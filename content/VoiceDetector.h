@@ -37,6 +37,7 @@ public:
     // 初期化： オーディオソースのデバイスを開き、フォーマットを設定
     bool init(int sampleRate, int channelCount = 1);
 
+public slots:
     bool resume();
     bool pause();
 

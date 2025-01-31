@@ -287,6 +287,8 @@ private:
     VoiceRecognitionEngine* m_voiceRecognitionEngine = nullptr;
     VoiceDetector*          m_voiceDetector = nullptr;
     QLocale                 m_detectedVoiceLocale;
+    QThread*                m_voiceRecognitionThread;
+    QThread*                m_voiceDetectorThread;
 
     OperationPhase          m_operationPhase = WaitingUserInput;
 

@@ -42,10 +42,6 @@ public:
     //  ここは外部(VoiceDetector等)から呼ばれる
     Q_INVOKABLE void addAudio(const std::vector<float> & pcmf32);
 
-    // ループ開始/停止 (VAD判定など)
-    Q_INVOKABLE void start();
-    Q_INVOKABLE void stop();
-
     bool isRunning() const { return m_running; }
 
     void setLanguage(const QString & language);
@@ -59,6 +55,12 @@ signals:
 
     void detectedVoiceLocaleChanged(const QLocale&);
     void changeOperationPhaseTo(OperationPhase newPhase);
+
+public slots:
+    // ループ開始/停止 (VAD判定など)
+    void start();
+    void stop();
+
 private slots:
     void processVadCheck();
 
