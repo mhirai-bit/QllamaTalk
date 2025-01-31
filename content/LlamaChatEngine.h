@@ -166,14 +166,14 @@ private slots:
     //--------------------------------------------------------------------------
     // Internal Slots (内部で呼ばれるSlots)
     //--------------------------------------------------------------------------
-    void onPartialResponse(const QString &textSoFar);
-    void onGenerationFinished(const QString &finalResponse);
     void onEngineInitFinished();
-    void onInferenceError(const QString &errorMessage);
-    void reinitLocalEngine();
     void initAfterDownload(bool success);
+    void reinitLocalEngine();
     void handleRecognizedText(const QString &text);
     void handleNewUserInput();
+    void onPartialResponse(const QString &textSoFar);
+    void onGenerationFinished(const QString &finalResponse);
+    void onInferenceError(const QString &errorMessage);
 
 private:
     //--------------------------------------------------------------------------
