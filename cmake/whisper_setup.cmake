@@ -57,12 +57,7 @@ set(WHISPER_OPTION_BUILD_TESTS    "-DWHISPER_BUILD_TESTS=OFF")
 set(WHISPER_OPTION_NO_INSTALL     "-DWHISPER_NO_INSTALL=ON")
 
 # ----------------------------------------------------------------------------
-# 4) Core ML 有効化のフラグ (Apple Silicon向けならON)
-# ----------------------------------------------------------------------------
-option(WHISPER_USE_COREML "Enable Core ML for whisper.cpp on Apple Silicon" ON)
-
-# ----------------------------------------------------------------------------
-# 5) iOS / macOS / Android / その他 でオプションを分岐
+# 4) iOS / macOS / Android / その他 でオプションを分岐
 # ----------------------------------------------------------------------------
 set(IOS_BUILD_OPTIONS "")
 set(ANDROID_BUILD_OPTIONS "")
@@ -79,13 +74,15 @@ if(APPLE)
             -DBUILD_SHARED_LIBS=OFF
         )
         if(WHISPER_USE_COREML)
-            # set(COREML_OPTION "-DWHISPER_COREML=1") # (無効化例)
+            set(WHISPER_BUILD_DIR "${WHISPER_SOURCE_DIR}/build_iOS_CoreML")
+            set(COREML_OPTION "-DWHISPER_COREML=1")
         endif()
     else()
         # macOS (Apple Silicon など)
         set(WHISPER_BUILD_DIR "${WHISPER_SOURCE_DIR}/build_macOS")
         if(WHISPER_USE_COREML)
-            # set(COREML_OPTION "-DWHISPER_COREML=1") # (無効化例)
+            set(COREML_OPTION "-DWHISPER_COREML=1")
+            set(WHISPER_BUILD_DIR "${WHISPER_SOURCE_DIR}/build_macOS_CoreML")
         endif()
     endif()
 elseif(ANDROID)
@@ -104,7 +101,7 @@ else()
 endif()
 
 # ----------------------------------------------------------------------------
-# 7) whisper.cpp をビルド
+# 5) whisper.cpp をビルド
 # ----------------------------------------------------------------------------
 set(WHISPER_BUILD_STAMP "${WHISPER_BUILD_DIR}/.whisper_build_done")
 
@@ -140,7 +137,7 @@ else()
 endif()
 
 # ----------------------------------------------------------------------------
-# 8) 上位 CMake に返す変数定義 (ライブラリパス, インクルードパス など)
+# 6) 上位 CMake に返す変数定義 (ライブラリパス, インクルードパス など)
 # ----------------------------------------------------------------------------
 if(WIN32)
     set(WHISPER_LIB_FILE_DIR  "${WHISPER_BUILD_DIR}/bin")
@@ -165,19 +162,3 @@ message(STATUS "WHISPER_MODEL_OUTPUT_PATH = ${WHISPER_MODEL_OUTPUT_PATH}")
 message(STATUS "WHISPER_MODEL_NAME        = ${WHISPER_MODEL_NAME}")
 message(STATUS "WHISPER_STATIC_LIB_DIR    = ${WHISPER_STATIC_LIB_DIR}")
 message(STATUS "------------------------------------------------")
-
-#
-# 9) モデルを QllamaTalkApp 実行ファイルの横にコピーß
-#    (ここでは、QllamaTalkApp という名称のターゲットが存在すると仮定)
-#
-# 例: ${CMAKE_RUNTIME_OUTPUT_DIRECTORY} に実行ファイルが出る場合や
-#     add_executable(QllamaTalkApp ...) 後に TGT_FILE_DIR が利用できる
-#
-# ※ 上位で QllamaTalkApp を定義している必要があります
-#
-add_custom_command(TARGET QllamaTalkApp POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-        "${WHISPER_MODEL_OUTPUT_PATH}"
-        "$<TARGET_FILE_DIR:QllamaTalkApp>/${WHISPER_MODEL_NAME}"
-    COMMENT "Copying Whisper model to QllamaTalkApp binary directory"
-)
