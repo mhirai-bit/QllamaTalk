@@ -11,13 +11,13 @@ project(QllamaTalkApp LANGUAGES CXX)
 # ----------------------------------------------------------------------------
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_llama_model.cmake)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/llama_setup.cmake)
-
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/llmRemoteServer_setup.cmake)
 set(CMAKE_AUTOMOC ON)
 
 # ----------------------------------------------------------------------------
 # Qt モジュールの検索
 # ----------------------------------------------------------------------------
-find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
+find_package(Qt6 6.2 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 TextToSpeech)
 
 if (Qt6_VERSION VERSION_GREATER_EQUAL 6.3)
     qt_standard_project_setup()
@@ -28,11 +28,19 @@ endif()
 # ----------------------------------------------------------------------------
 qt_add_executable(QllamaTalkApp
     src/main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/AndroidManifest.xml
-    ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/build.gradle
-    ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/res/values/libs.xml
-    ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/res/xml/qtprovider_paths.xml
 )
+
+if(ANDROID)
+    target_sources(QllamaTalkApp PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/AndroidManifest.xml
+        ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/build.gradle
+        ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/res/values/libs.xml
+        ${CMAKE_CURRENT_SOURCE_DIR}/platforms/android/res/xml/qtprovider_paths.xml
+    )
+endif()
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/download_whisper_model.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/whisper_setup.cmake)
 
 if(IOS)
     set_target_properties(QllamaTalkApp
@@ -48,6 +56,7 @@ if(IOS)
         ${asset_catalog_path}
         PROPERTIES MACOSX_PACKAGE_LOCATION Resources
     )
+    qt_add_ios_ffmpeg_libraries(QllamaTalkApp)
 endif()
 if(ANDROID)
     set_property(TARGET QllamaTalkApp PROPERTY QT_ANDROID_PACKAGE_SOURCE_DIR
@@ -73,6 +82,7 @@ target_link_libraries(QllamaTalkApp PRIVATE
     Qt6::Qml
     Qt6::Quick
     Qt6::QuickControls2
+    Qt6::TextToSpeech
 )
 
 # ----------------------------------------------------------------------------
@@ -156,7 +166,15 @@ if(ANDROID)
         endforeach()
     endif()
 
+    # whisper
+    add_library(whisper SHARED IMPORTED)
+    set_target_properties(whisper PROPERTIES
+        IMPORTED_LOCATION "${WHISPER_LIB_FILE_DIR}/libwhisper.so"
+        ANDROID_PACKAGE_SHARED_LIBS ON
+    )
+    target_link_libraries(QllamaTalkApp PRIVATE whisper)
+
     message(STATUS "IMPORTED llama => ${LLAMA_SO_PATH}")
     message(STATUS "IMPORTED ggml  => ${GGML_SO_PATHS}")
-
+    message(STATUS "IMPORTED whisper => ${WHISPER_LIB_FILE_DIR}/libwhisper.so")
 endif()

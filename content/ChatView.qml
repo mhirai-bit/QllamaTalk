@@ -4,6 +4,7 @@
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 import content
 
 Rectangle {
@@ -125,39 +126,63 @@ Rectangle {
         }
     }
 
-    Column {
+    ColumnLayout {
         anchors.centerIn: parent
         visible: !modelDownloadProgressIndicator.visible
         BusyIndicator {
             visible: root.isRemote ? !LlamaChatEngine.remoteInitialized : !LlamaChatEngine.localInitialized
             running: visible
+            Layout.alignment: Qt.AlignHCenter
         }
 
         Label {
             id: loadingText
-            anchors.horizontalCenter: parent.horizontalCenter
             text: qsTr("Loading AI...")
             visible: root.isRemote ? !LlamaChatEngine.remoteInitialized : !LlamaChatEngine.localInitialized
             color: "#f3f3f4"
             font.pointSize: 14
+            Layout.alignment: Qt.AlignHCenter
         }
     }
 
     Column {
-        id: modelDownloadProgressIndicator
         anchors.centerIn: parent
-        spacing: 8
-        visible: root.isRemote ? false : LlamaChatEngine.modelDownloadInProgress
-        ProgressBar {
-            from: 0.0
-            to: 1.0
-            value: LlamaChatEngine.modelDownloadProgress
+        spacing: 24
+        ColumnLayout {
+            id: modelDownloadProgressIndicator
+            spacing: 8
+            visible: root.isRemote ? false : LlamaChatEngine.modelDownloadInProgress
+            ProgressBar {
+                from: 0.0
+                to: 1.0
+                value: LlamaChatEngine.modelDownloadProgress
+                Layout.alignment: Qt.AlignHCenter
+            }
+            Label {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: qsTr("Downloading llama model...")
+                color: "#f3f3f4"
+                font.pointSize: 14
+                Layout.alignment: Qt.AlignHCenter
+            }
         }
-        Label {
-            anchors.horizontalCenter: parent.horizontalCenter
-            text: qsTr("Downloading model...")
-            color: "#f3f3f4"
-            font.pointSize: 14
+        ColumnLayout {
+            id: whisperModelDownloadProgressIndicator
+            spacing: 8
+            visible: LlamaChatEngine.whisperModelDownloadInProgress
+            ProgressBar {
+                from: 0.0
+                to: 1.0
+                value: LlamaChatEngine.whisperModelDownloadProgress
+                Layout.alignment: Qt.AlignHCenter
+            }
+            Label {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: qsTr("Downloading whisper model...")
+                color: "#f3f3f4"
+                font.pointSize: 14
+                Layout.alignment: Qt.AlignHCenter
+            }
         }
     }
 }

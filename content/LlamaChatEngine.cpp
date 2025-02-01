@@ -11,9 +11,9 @@
 #include <QFile>
 #include <QEventLoop>
 #include <QTimer>
-#include <functional>
 #include "LlamaResponseGenerator.h"
 #include "rep_LlamaResponseGenerator_replica.h"
+#include "common.h"
 
 //------------------------------------------------------------------------------
 // Static: Default LLaMA model path
@@ -23,6 +23,9 @@
 #ifdef Q_OS_ANDROID
 // Android では最初は空文字にする (実際のパスは initializeModelPathForAndroid() で決める)
 const std::string LlamaChatEngine::mModelPath {""};
+#ifndef WHISPER_DOWNLOAD_URL
+#warning "WHISPER_DOWNLOAD_URL is not defined. Make sure to define it in CMake."
+#endif
 #else
 // Windows/macOS/Linux/iOSなどの例 (従来通り)
 const std::string LlamaChatEngine::mModelPath {
@@ -211,7 +214,7 @@ void LlamaChatEngine::setupCommonConnections()
     teardownCommonConnections();
     mHandleNewUserInputConnection = connect(
         this, &LlamaChatEngine::userInputChanged,
-        this, &LlamaChatEngine::handle_new_user_input
+        this, &LlamaChatEngine::handleNewUserInput
         );
     qDebug() << "[setupCommonConnections] Common connections established.";
 }
@@ -250,6 +253,10 @@ void LlamaChatEngine::teardownLocalConnections()
         disconnect(*mLocalGenerationFinishedConnection);
         mLocalGenerationFinishedConnection.reset();
     }
+    if (mLocalGenerationFinishedToQMLConnection.has_value()) {
+        disconnect(*mLocalGenerationFinishedToQMLConnection);
+        mLocalGenerationFinishedToQMLConnection.reset();
+    }
     if (mLocalGenerationErrorConnection.has_value()) {
         disconnect(*mLocalGenerationErrorConnection);
         mLocalGenerationErrorConnection.reset();
@@ -283,6 +290,11 @@ void LlamaChatEngine::setupLocalConnections()
     mLocalGenerationFinishedConnection = connect(
         mLocalGenerator, &LlamaResponseGenerator::generationFinished,
         this, &LlamaChatEngine::onGenerationFinished
+        );
+
+    mLocalGenerationFinishedToQMLConnection = connect(
+        mLocalGenerator, &LlamaResponseGenerator::generationFinished,
+        this, &LlamaChatEngine::generationFinishedToQML
         );
 
     mLocalGenerationErrorConnection = connect(
@@ -323,6 +335,10 @@ void LlamaChatEngine::teardownRemoteConnections()
         disconnect(*mRemoteGenerationFinishedConnection);
         mRemoteGenerationFinishedConnection.reset();
     }
+    if (mRemoteGenerationFinishedToQMLConnection.has_value()) {
+        disconnect(*mRemoteGenerationFinishedToQMLConnection);
+        mRemoteGenerationFinishedToQMLConnection.reset();
+    }
     if (mRemoteGenerationErrorConnection.has_value()) {
         disconnect(*mRemoteGenerationErrorConnection);
         mRemoteGenerationErrorConnection.reset();
@@ -354,6 +370,11 @@ void LlamaChatEngine::setupRemoteConnections()
         this, &LlamaChatEngine::onGenerationFinished
         );
 
+    mRemoteGenerationFinishedToQMLConnection = connect(
+        &mRemoteGenerator, &RemoteResponseGeneratorCompositor::generationFinished,
+        this, &LlamaChatEngine::generationFinishedToQML
+        );
+
     mRemoteGenerationErrorConnection = connect(
         &mRemoteGenerator, &RemoteResponseGeneratorCompositor::generationError,
         this, &LlamaChatEngine::inferenceErrorToQML
@@ -368,10 +389,10 @@ void LlamaChatEngine::setupRemoteConnections()
 }
 
 //------------------------------------------------------------------------------
-// handle_new_user_input
+// handleNewUserInput
 // ユーザー入力を処理し、requestGenerationをemit
 //------------------------------------------------------------------------------
-void LlamaChatEngine::handle_new_user_input()
+void LlamaChatEngine::handleNewUserInput()
 {
     if (mInProgress) {
         qDebug() << "Generation in progress, ignoring new input.";
@@ -382,6 +403,7 @@ void LlamaChatEngine::handle_new_user_input()
         return;
     }
 
+    setOperationPhase(LlamaRunning);
     LlamaChatMessage msg;
     msg.setRole(QStringLiteral("user"));
     msg.setContent(mUserInput);
@@ -407,6 +429,39 @@ void LlamaChatEngine::switchEngineMode(EngineMode newMode)
         return;
     }
     doImmediateEngineSwitch(newMode);
+}
+
+void LlamaChatEngine::pauseVoiceDetection()
+{
+    if(!m_voiceDetector) {
+        qWarning() << "Voice detector not initialized.";
+        return;
+    }
+    m_voiceDetector->pause();
+}
+
+void LlamaChatEngine::resumeVoiceDetection()
+{
+    if(!m_voiceDetector) {
+        qWarning() << "Voice detector not initialized.";
+        return;
+    }
+    m_voiceDetector->resume();
+}
+
+void LlamaChatEngine::setVoiceRecognitionLanguage(const QString &language)
+{
+    if(!m_voiceRecognitionEngine) {
+        qWarning() << "Voice recognition engine not initialized.";
+        return;
+    }
+    m_voiceRecognitionEngine->setLanguage(language);
+}
+
+void LlamaChatEngine::initiateVoiceRecognition()
+{
+    initVoiceRecognition();
+    startVoiceRecognition();
 }
 
 //------------------------------------------------------------------------------
@@ -440,6 +495,12 @@ void LlamaChatEngine::onGenerationFinished(const QString &finalResponse)
         EngineMode pending = *mPendingEngineSwitchMode;
         mPendingEngineSwitchMode.reset();
         doImmediateEngineSwitch(pending);
+    }
+
+    if(m_voiceDetector && m_voiceRecognitionEngine) {
+        setOperationPhase(Listening);
+    } else {
+        setOperationPhase(WaitingUserInput);
     }
 }
 
@@ -506,14 +567,21 @@ bool LlamaChatEngine::initializeModelPathForAndroid()
 #endif
 
 #ifdef LLAMA_DOWNLOAD_URL
-    downloadModelIfNeededAsync();
+    downloadModelIfNeededAsync(); // ← LLaMAモデルのダウンロード
 #else
     qWarning() << "LLAMA_DOWNLOAD_URL is not defined. Cannot proceed.";
     return false;
 #endif
 
+#ifdef WHISPER_DOWNLOAD_URL
+    downloadWhisperModelIfNeededAsync(); // ← Whisperモデルのダウンロード
+#else
+    qWarning() << "WHISPER_DOWNLOAD_URL is not defined. Cannot proceed.";
+#endif
+
     return true;
 }
+
 
 //------------------------------------------------------------------------------
 // downloadModelIfNeededAsync
@@ -525,7 +593,7 @@ void LlamaChatEngine::downloadModelIfNeededAsync()
             this, &LlamaChatEngine::initAfterDownload);
 
     // (0) check if file already exists
-    QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    const QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     if (writableDir.isEmpty()) {
         qWarning() << "[downloadModelIfNeededAsync] No writable directory found!";
         QMetaObject::invokeMethod(this, [this](){
@@ -535,7 +603,7 @@ void LlamaChatEngine::downloadModelIfNeededAsync()
     }
     QDir().mkpath(writableDir);
 
-    QString localModelPath = writableDir + "/" + LLAMA_MODEL_FILE;
+    const QString localModelPath = writableDir + "/" + LLAMA_MODEL_FILE;
     if (QFile::exists(localModelPath)) {
         qDebug() << "[downloadModelIfNeededAsync] Model already exists:" << localModelPath;
         QMetaObject::invokeMethod(this, [this](){
@@ -549,7 +617,7 @@ void LlamaChatEngine::downloadModelIfNeededAsync()
                  << "to:" << localModelPath;
 
         QNetworkAccessManager manager;
-        QNetworkRequest request( QUrl(QStringLiteral( LLAMA_DOWNLOAD_URL )) );
+        const QNetworkRequest request( QUrl(QStringLiteral( LLAMA_DOWNLOAD_URL )) );
         QNetworkReply* reply = manager.get(request);
 
         connect(reply, &QNetworkReply::downloadProgress, this, [=](qint64 bytesReceived, qint64 bytesTotal) {
@@ -574,7 +642,7 @@ void LlamaChatEngine::downloadModelIfNeededAsync()
             qWarning() << "[downloadModelIfNeededAsync] Download error:" << reply->errorString();
             success = false;
         } else {
-            QByteArray data = reply->readAll();
+            const QByteArray data = reply->readAll();
             QFile outFile(localModelPath);
             if (!outFile.open(QIODevice::WriteOnly)) {
                 qWarning() << "[downloadModelIfNeededAsync] Failed to open for writing:" << localModelPath;
@@ -596,6 +664,103 @@ void LlamaChatEngine::downloadModelIfNeededAsync()
     setModelDownloadInProgress(true);
 }
 
+
+void LlamaChatEngine::downloadWhisperModelIfNeededAsync()
+{
+    // 1) コールバックをつないでおく
+    connect(this, &LlamaChatEngine::whisperModelDownloadFinished,
+            this, &LlamaChatEngine::onWhisperDownloadFinished);
+
+    // 2) すでにファイルが存在していればスキップ
+    const QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (writableDir.isEmpty()) {
+        qWarning() << "[downloadWhisperModelIfNeededAsync] No writable directory found!";
+        emit whisperModelDownloadFinished(false);
+        return;
+    }
+    QDir().mkpath(writableDir);
+
+    const QString localModelPath = writableDir + "/" + WHISPER_MODEL_NAME;
+    if (QFile::exists(localModelPath)) {
+        qDebug() << "[downloadWhisperModelIfNeededAsync] Whisper model already exists:" << localModelPath;
+        emit whisperModelDownloadFinished(true);
+        return;
+    }
+
+    // 3) ダウンロード用タスク
+    auto task = [=]() {
+        qDebug() << "[downloadWhisperModelIfNeededAsync] Downloading from:" << WHISPER_DOWNLOAD_URL
+                 << "to:" << localModelPath;
+
+        QNetworkAccessManager manager;
+        const QNetworkRequest request(QUrl(QStringLiteral(WHISPER_DOWNLOAD_URL)));
+        QNetworkReply* reply = manager.get(request);
+
+        // ダウンロード進捗のハンドリング（必要ならUIに表示）
+        connect(reply, &QNetworkReply::downloadProgress, this, [=](qint64 bytesReceived, qint64 bytesTotal){
+            if (bytesTotal > 0) {
+                double progress = static_cast<double>(bytesReceived) / static_cast<double>(bytesTotal);
+                mWhisperModelDownloadProgress = progress;
+                QMetaObject::invokeMethod(this, [this]() {
+                    emit whisperModelDownloadProgressChanged();
+                    qDebug() << "[downloadWhisperModelIfNeededAsync] Progress:" << mWhisperModelDownloadProgress;
+                }, Qt::QueuedConnection);
+            }
+        });
+
+        // 同期的に待機 (スレッドプール上で)
+        QEventLoop loop;
+        connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+        loop.exec();
+
+        bool success = true;
+        setWhisperModelDownloadInProgress(false);
+        if (reply->error() != QNetworkReply::NoError) {
+            qWarning() << "[downloadWhisperModelIfNeededAsync] Download error:" << reply->errorString();
+            success = false;
+        } else {
+            const QByteArray data = reply->readAll();
+            QFile outFile(localModelPath);
+            if (!outFile.open(QIODevice::WriteOnly)) {
+                qWarning() << "[downloadWhisperModelIfNeededAsync] Failed to open for writing:" << localModelPath;
+                success = false;
+            } else {
+                outFile.write(data);
+                outFile.close();
+                qDebug() << "[downloadWhisperModelIfNeededAsync] Whisper model saved to:" << localModelPath;
+            }
+        }
+        reply->deleteLater();
+
+        // メインスレッドに結果を返す
+        QMetaObject::invokeMethod(this, [this, success]() {
+            emit whisperModelDownloadFinished(success);
+        }, Qt::QueuedConnection);
+    };
+
+    // 4) タスクをスレッドプールで実行
+    QThreadPool::globalInstance()->start(task);
+    setWhisperModelDownloadInProgress(true);
+}
+
+// ダウンロード完了ハンドラ
+void LlamaChatEngine::onWhisperDownloadFinished(bool success)
+{
+    if (!success) {
+        qWarning() << "[onWhisperDownloadFinished] Whisper model download failed, cannot proceed.";
+        // 必要に応じてフラグを立てる/ユーザにリトライ促す etc.
+        return;
+    }
+
+    const QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    const QString localModelPath = writableDir + "/" + WHISPER_MODEL_NAME;
+
+    mWhisperModelPath = localModelPath.toStdString();
+    mWhisperModelReady = true;
+
+    qDebug() << "[onWhisperDownloadFinished] Whisper model is ready at" << localModelPath;
+}
+
 //------------------------------------------------------------------------------
 // initAfterDownload
 // ダウンロード完了後に呼ばれるスロット
@@ -607,8 +772,8 @@ void LlamaChatEngine::initAfterDownload(bool success)
         return;
     }
 
-    QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    QString localModelPath = writableDir + "/" + LLAMA_MODEL_FILE;
+    const QString writableDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    const QString localModelPath = writableDir + "/" + LLAMA_MODEL_FILE;
     std::string *ptr = const_cast<std::string*>(&mModelPath);
     *ptr = localModelPath.toStdString();
 
@@ -628,6 +793,191 @@ void LlamaChatEngine::setCurrentEngineMode(EngineMode newCurrentEngineMode)
     }
     mCurrentEngineMode = newCurrentEngineMode;
     emit currentEngineModeChanged();
+}
+
+void LlamaChatEngine::initVoiceRecognition()
+{
+    // すでに存在しているならクリーンアップする
+    if (m_voiceDetectorThread) {
+        m_voiceDetectorThread->quit();
+        m_voiceDetectorThread->wait();
+        m_voiceDetectorThread->deleteLater();
+        m_voiceDetectorThread = nullptr;
+    }
+
+    if (m_voiceRecognitionThread) {
+        m_voiceRecognitionThread->quit();
+        m_voiceRecognitionThread->wait();
+        m_voiceRecognitionThread->deleteLater();
+        m_voiceRecognitionThread = nullptr;
+    }
+
+    m_voiceDetectorThread = new QThread(this);
+    m_voiceRecognitionThread = new QThread(this);
+
+    if (m_voiceRecognitionEngine) {
+        // すでに作ってたら再初期化など
+        delete m_voiceRecognitionEngine;
+        m_voiceRecognitionEngine = nullptr;
+    }
+    m_voiceRecognitionEngine = new VoiceRecognitionEngine(this);
+
+    // Whisper設定
+    VoiceRecParams vrParams;
+    vrParams.language = "auto";
+#ifdef Q_OS_ANDROID
+    vrParams.model   = mWhisperModelPath;
+#else
+    vrParams.model    = WHISPER_MODEL_NAME;
+#endif
+    vrParams.length_for_inference_ms  = 10000;  // 10秒取りたい
+    vrParams.vad_thold  = 0.6f;
+    vrParams.freq_thold = 100.0f;
+    // ... GPU設定など
+
+    const bool ok = m_voiceRecognitionEngine->initWhisper(vrParams);
+    if (!ok) {
+        qWarning() << "Failed to init VoiceRecognitionEngine";
+        return;
+    }
+
+    // シグナル接続: 音声認識結果 -> handleRecognizedText()
+    connect(m_voiceRecognitionEngine, &VoiceRecognitionEngine::textRecognized,
+            this, &LlamaChatEngine::handleRecognizedText);
+    // whisperが検知した言語が変わったらdetectedVoiceLocaleにセット
+    connect(m_voiceRecognitionEngine, &VoiceRecognitionEngine::detectedVoiceLocaleChanged,
+            this, &LlamaChatEngine::setDetectedVoiceLocale);
+    // オペレーションのフェーズ遷移シグナルの接続
+    connect(m_voiceRecognitionEngine, &VoiceRecognitionEngine::changeOperationPhaseTo,
+            this, &LlamaChatEngine::setOperationPhase);
+
+    if (!m_voiceDetector) {
+        m_voiceDetector = new VoiceDetector(vrParams.length_for_inference_ms, this);
+        // VoiceDetectorが音声を取得したら voiceEngine->addAudio(...) へ渡す
+        connect(m_voiceDetector, &VoiceDetector::audioAvailable,
+                m_voiceRecognitionEngine, &VoiceRecognitionEngine::addAudio);
+        // オペレーションのフェーズ遷移シングナルの接続
+        connect(m_voiceDetector, &VoiceDetector::changeOperationPhaseTo,
+                this, &LlamaChatEngine::setOperationPhase);
+        // VoiceDetectorの初期化 (例: init(16kHz), start capturing, etc.)
+        m_voiceDetector->init(/*sampleRate=*/COMMON_SAMPLE_RATE, /*channelCount=*/1);
+    }
+}
+
+void LlamaChatEngine::startVoiceRecognition()
+{
+    if (!m_voiceRecognitionEngine) {
+        initVoiceRecognition();
+    }
+    if (m_voiceDetector && !m_voiceRecognitionEngine->isRunning()) {
+        m_voiceDetector->setParent(nullptr);
+        m_voiceDetector->moveToThread(m_voiceDetectorThread);
+        connect(m_voiceDetectorThread, &QThread::finished,
+                m_voiceDetector, &QObject::deleteLater);
+        m_voiceDetectorThread->start();
+        // VoiceDetectorスタート
+        QMetaObject::invokeMethod(
+            m_voiceDetector,
+            "resume",
+            Qt::QueuedConnection
+            );
+
+        m_voiceRecognitionEngine->setParent(nullptr);
+        m_voiceRecognitionEngine->moveToThread(m_voiceRecognitionThread);
+        connect(m_voiceRecognitionThread, &QThread::finished,
+                m_voiceRecognitionEngine, &QObject::deleteLater);
+        m_voiceRecognitionThread->start();
+        // VoiceRecognitionEngineスタート
+        QMetaObject::invokeMethod(
+            m_voiceRecognitionEngine,
+            "start",
+            Qt::QueuedConnection
+            );
+    }
+}
+
+void LlamaChatEngine::stopVoiceRecognition()
+{
+    if (m_voiceDetector) {
+        QMetaObject::invokeMethod(
+            m_voiceDetector,
+            "pause",
+            Qt::QueuedConnection
+            );
+    }
+    if (m_voiceRecognitionEngine && m_voiceRecognitionEngine->isRunning()) {
+        QMetaObject::invokeMethod(
+            m_voiceRecognitionEngine,
+            "stop",
+            Qt::QueuedConnection
+            );
+    }
+    setOperationPhase(WaitingUserInput);
+}
+
+
+bool LlamaChatEngine::whisperModelDownloadInProgress() const
+{
+    return mWhisperModelDownloadInProgress;
+}
+
+void LlamaChatEngine::setWhisperModelDownloadInProgress(bool newWhisperModelDownloadInProgress)
+{
+    if (mWhisperModelDownloadInProgress == newWhisperModelDownloadInProgress)
+        return;
+    mWhisperModelDownloadInProgress = newWhisperModelDownloadInProgress;
+    emit whisperModelDownloadInProgressChanged();
+}
+
+double LlamaChatEngine::whisperModelDownloadProgress() const
+{
+    return mWhisperModelDownloadProgress;
+}
+
+void LlamaChatEngine::setWhisperModelDownloadProgress(double newWhisperModelDownloadProgress)
+{
+    if (qFuzzyCompare(mWhisperModelDownloadProgress, newWhisperModelDownloadProgress))
+        return;
+    mWhisperModelDownloadProgress = newWhisperModelDownloadProgress;
+    emit whisperModelDownloadProgressChanged();
+}
+
+OperationPhase LlamaChatEngine::operationPhase() const
+{
+    return m_operationPhase;
+}
+
+void LlamaChatEngine::setOperationPhase(OperationPhase newOperationPhase)
+{
+    if (m_operationPhase == newOperationPhase)
+        return;
+
+    if((m_operationPhase == LlamaRunning || m_operationPhase == Speaking) && (newOperationPhase != WaitingUserInput && newOperationPhase != Listening)) {
+        return;
+    }
+
+    m_operationPhase = newOperationPhase;
+    emit operationPhaseChanged();
+}
+
+void LlamaChatEngine::setDetectedVoiceLocale(const QLocale &newDetectedVoiceLocale)
+{
+    if (m_detectedVoiceLocale == newDetectedVoiceLocale)
+        return;
+    m_detectedVoiceLocale = newDetectedVoiceLocale;
+    emit detectedVoiceLocaleChanged();
+}
+
+QLocale LlamaChatEngine::detectedVoiceLocale() const
+{
+    return m_detectedVoiceLocale;
+}
+
+void LlamaChatEngine::handleRecognizedText(const QString &text)
+{
+    // LlamaChatEngineの setUserInput を呼ぶ例
+    qDebug() << "[LlamaChatEngine] recognized text => setUserInput:" << text;
+    setUserInput(text);
 }
 
 //------------------------------------------------------------------------------

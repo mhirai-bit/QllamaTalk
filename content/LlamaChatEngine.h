@@ -2,15 +2,18 @@
 #define LLAMACHATENGINE_H
 
 #include <optional>
-#include <QObject>
 #include <QQmlEngine>
 #include <QRemoteObjectNode>
 #include <QThread>
 #include <QMetaObject>
+#include <QObject>
 #include "ChatMessageModel.h"
 #include "LlamaResponseGenerator.h"
 #include "rep_LlamaResponseGenerator_replica.h"
 #include "RemoteResponseGeneratorCompositor.h"
+#include "VoiceDetector.h"
+#include "VoiceRecognitionEngine.h"
+#include "OperationPhase.h"
 #include "llama.h"
 
 /*
@@ -33,70 +36,22 @@ class LlamaChatEngine : public QObject
     //--------------------------------------------------------------------------
     // QML Properties (QMLプロパティ)
     //--------------------------------------------------------------------------
-    Q_PROPERTY(ChatMessageModel* messages
-                   READ messages
-                       CONSTANT)
-
-    Q_PROPERTY(QString userInput
-                   READ userInput
-                       WRITE setUserInput
-                           RESET resetUserInput
-                               NOTIFY userInputChanged
-                                   FINAL)
-
-    Q_PROPERTY(EngineMode currentEngineMode
-                   READ currentEngineMode
-                       NOTIFY currentEngineModeChanged
-                           FINAL)
-
-    Q_PROPERTY(QString ipAddress
-                   READ ipAddress
-                       WRITE setIpAddress
-                           NOTIFY ipAddressChanged
-                               FINAL)
-
-    Q_PROPERTY(int portNumber
-                   READ portNumber
-                       WRITE setPortNumber
-                           NOTIFY portNumberChanged
-                               FINAL)
-
-    Q_PROPERTY(bool localInitialized
-                   READ localInitialized
-                       WRITE setLocalInitialized
-                           NOTIFY localInitializedChanged
-                               FINAL)
-
-    Q_PROPERTY(bool remoteInitialized
-                   READ remoteInitialized
-                       WRITE setRemoteInitialized
-                           NOTIFY remoteInitializedChanged
-                               FINAL)
-
-    Q_PROPERTY(bool remoteAiInError
-                   READ remoteAiInError
-                       NOTIFY remoteAiInErrorChanged
-                           FINAL)
-
-    Q_PROPERTY(bool localAiInError
-                   READ localAiInError
-                       NOTIFY localAiInErrorChanged
-                           FINAL)
-
-    Q_PROPERTY(bool inProgress
-                   READ inProgress
-                       NOTIFY inProgressChanged
-                           FINAL)
-
-    Q_PROPERTY(double modelDownloadProgress
-                   READ modelDownloadProgress
-                       NOTIFY modelDownloadProgressChanged
-                           FINAL)
-
-    Q_PROPERTY(bool modelDownloadInProgress
-                   READ modelDownloadInProgress
-                       NOTIFY modelDownloadInProgressChanged
-                           FINAL)
+    Q_PROPERTY(ChatMessageModel* messages READ messages CONSTANT)
+    Q_PROPERTY(QString userInput READ userInput WRITE setUserInput RESET resetUserInput NOTIFY userInputChanged FINAL)
+    Q_PROPERTY(EngineMode currentEngineMode READ currentEngineMode NOTIFY currentEngineModeChanged FINAL)
+    Q_PROPERTY(QString ipAddress READ ipAddress WRITE setIpAddress NOTIFY ipAddressChanged FINAL)
+    Q_PROPERTY(int portNumber READ portNumber WRITE setPortNumber NOTIFY portNumberChanged FINAL)
+    Q_PROPERTY(bool localInitialized READ localInitialized WRITE setLocalInitialized NOTIFY localInitializedChanged FINAL)
+    Q_PROPERTY(bool remoteInitialized READ remoteInitialized WRITE setRemoteInitialized NOTIFY remoteInitializedChanged FINAL)
+    Q_PROPERTY(bool remoteAiInError READ remoteAiInError NOTIFY remoteAiInErrorChanged FINAL)
+    Q_PROPERTY(bool localAiInError READ localAiInError NOTIFY localAiInErrorChanged FINAL)
+    Q_PROPERTY(bool inProgress READ inProgress NOTIFY inProgressChanged FINAL)
+    Q_PROPERTY(double modelDownloadProgress READ modelDownloadProgress NOTIFY modelDownloadProgressChanged FINAL)
+    Q_PROPERTY(bool modelDownloadInProgress READ modelDownloadInProgress NOTIFY modelDownloadInProgressChanged FINAL)
+    Q_PROPERTY(QLocale detectedVoiceLocale READ detectedVoiceLocale NOTIFY detectedVoiceLocaleChanged FINAL)
+    Q_PROPERTY(OperationPhase operationPhase READ operationPhase WRITE setOperationPhase NOTIFY operationPhaseChanged FINAL)
+    Q_PROPERTY(double whisperModelDownloadProgress READ whisperModelDownloadProgress NOTIFY whisperModelDownloadProgressChanged FINAL)
+    Q_PROPERTY(bool whisperModelDownloadInProgress READ whisperModelDownloadInProgress NOTIFY whisperModelDownloadInProgressChanged FINAL)
 
 public:
     //--------------------------------------------------------------------------
@@ -110,6 +65,11 @@ public:
     Q_ENUM(EngineMode)
 
     //--------------------------------------------------------------------------
+    // OperationPhase Enum (オペレーションフェーズ列挙: 現在実行中の処理フェーズを示す)
+    //--------------------------------------------------------------------------
+    Q_ENUM(OperationPhase)
+
+    //--------------------------------------------------------------------------
     // Constructor / Destructor
     // コンストラクタ / デストラクタ
     //--------------------------------------------------------------------------
@@ -120,6 +80,11 @@ public:
     // QML-Invokable Methods (QMLから呼び出せるpublicメソッド)
     //--------------------------------------------------------------------------
     Q_INVOKABLE void switchEngineMode(EngineMode mode);
+    Q_INVOKABLE void pauseVoiceDetection();
+    Q_INVOKABLE void resumeVoiceDetection();
+    Q_INVOKABLE void setVoiceRecognitionLanguage(const QString &language);
+    Q_INVOKABLE void initiateVoiceRecognition();
+    Q_INVOKABLE void stopVoiceRecognition();
 
     //--------------------------------------------------------------------------
     // QML-Exposed Getters / Setters (QMLに公開されるゲッター/セッター)
@@ -159,41 +124,56 @@ public:
     bool modelDownloadInProgress() const;
     void setModelDownloadInProgress(bool newModelDownloadInProgress);
 
-public slots:
-    //--------------------------------------------------------------------------
-    // Public Slots (外部/QMLなどから呼ばれる可能性のあるSlots)
-    //--------------------------------------------------------------------------
-    void handle_new_user_input();
+    QLocale detectedVoiceLocale() const;
+
+    void setDetectedVoiceLocale(const QLocale &newDetectedVoiceLocale);
+
+    OperationPhase operationPhase() const;
+    void setOperationPhase(OperationPhase newOperationPhase);
+
+    double whisperModelDownloadProgress() const;
+    void setWhisperModelDownloadProgress(double newWhisperModelDownloadProgress);
+
+    bool whisperModelDownloadInProgress() const;
+    void setWhisperModelDownloadInProgress(bool newWhisperModelDownloadInProgress);
 
 signals:
     //--------------------------------------------------------------------------
     // Signals (シグナル)
     //--------------------------------------------------------------------------
     void userInputChanged();
-    void requestGeneration(const QList<LlamaChatMessage>& messages);
     void currentEngineModeChanged();
     void ipAddressChanged();
     void portNumberChanged();
     void localInitializedChanged();
     void remoteInitializedChanged();
-    void inferenceErrorToQML(const QString &errorMessage);
     void remoteAiInErrorChanged();
     void localAiInErrorChanged();
     void inProgressChanged();
-    void modelDownloadFinished(bool success);
     void modelDownloadProgressChanged();
     void modelDownloadInProgressChanged();
+    void detectedVoiceLocaleChanged();
+    void operationPhaseChanged();
+    void requestGeneration(const QList<LlamaChatMessage>& messages);
+    void generationFinishedToQML(const QString& finalResponse);
+    void inferenceErrorToQML(const QString &errorMessage);
+    void modelDownloadFinished(bool success);
+    void whisperModelDownloadFinished(bool success);
+    void whisperModelDownloadProgressChanged();
+    void whisperModelDownloadInProgressChanged();
 
 private slots:
     //--------------------------------------------------------------------------
     // Internal Slots (内部で呼ばれるSlots)
     //--------------------------------------------------------------------------
+    void onEngineInitFinished();
+    void initAfterDownload(bool success);
+    void reinitLocalEngine();
+    void handleRecognizedText(const QString &text);
+    void handleNewUserInput();
     void onPartialResponse(const QString &textSoFar);
     void onGenerationFinished(const QString &finalResponse);
-    void onEngineInitFinished();
     void onInferenceError(const QString &errorMessage);
-    void reinitLocalEngine();
-    void initAfterDownload(bool success);
 
 private:
     //--------------------------------------------------------------------------
@@ -210,6 +190,9 @@ private:
     void downloadModelIfNeededAsync();
     void setCurrentEngineMode(EngineMode newCurrentEngineMode);
 
+    void initVoiceRecognition();
+    void startVoiceRecognition();
+
     //--------------------------------------------------------------------------
     // Constants (定数)
     //--------------------------------------------------------------------------
@@ -223,6 +206,13 @@ private:
     // modelをランタイムでダウンロードする際の進捗
     double mModelDownloadProgress {0.0};
     bool   mModelDownloadInProgress {false};
+    double mWhisperModelDownloadProgress {0.0};
+    bool   mWhisperModelDownloadInProgress {false};
+
+    std::string mWhisperModelPath;
+    bool mWhisperModelReady { false };
+    void downloadWhisperModelIfNeededAsync();
+    void onWhisperDownloadFinished(bool success);
 
     //--------------------------------------------------------------------------
     // LLaMA Model / Context (LLaMAモデル/コンテキスト)
@@ -282,6 +272,7 @@ private:
     std::optional<QMetaObject::Connection> mRemoteRequestGenerationConnection;
     std::optional<QMetaObject::Connection> mRemotePartialResponseConnection;
     std::optional<QMetaObject::Connection> mRemoteGenerationFinishedConnection;
+    std::optional<QMetaObject::Connection> mRemoteGenerationFinishedToQMLConnection;
     std::optional<QMetaObject::Connection> mRemoteGenerationErrorConnection;
     std::optional<QMetaObject::Connection> mRemoteGenerationErrorToQmlConnection;
 
@@ -289,8 +280,17 @@ private:
     std::optional<QMetaObject::Connection> mLocalRequestGenerationConnection;
     std::optional<QMetaObject::Connection> mLocalPartialResponseConnection;
     std::optional<QMetaObject::Connection> mLocalGenerationFinishedConnection;
+    std::optional<QMetaObject::Connection> mLocalGenerationFinishedToQMLConnection;
     std::optional<QMetaObject::Connection> mLocalGenerationErrorConnection;
     std::optional<QMetaObject::Connection> mLocalGenerationErrorToQmlConnection;
+
+    VoiceRecognitionEngine* m_voiceRecognitionEngine = nullptr;
+    VoiceDetector*          m_voiceDetector = nullptr;
+    QLocale                 m_detectedVoiceLocale;
+    QThread*                m_voiceRecognitionThread;
+    QThread*                m_voiceDetectorThread;
+
+    OperationPhase          m_operationPhase = WaitingUserInput;
 
     // Additional helper connection setup/teardown
     void setupRemoteConnections();

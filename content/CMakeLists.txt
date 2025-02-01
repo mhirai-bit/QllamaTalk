@@ -1,5 +1,5 @@
 qt_add_library(content STATIC)
-find_package(Qt6 REQUIRED COMPONENTS Concurrent RemoteObjects WebSockets)
+find_package(Qt6 REQUIRED COMPONENTS Concurrent RemoteObjects WebSockets Multimedia TextToSpeech)
 
 qt6_add_repc_replicas(content
     ../LLMRemoteServer/QtRemoteObjectsFiles/LlamaResponseGenerator.rep
@@ -14,6 +14,8 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 target_compile_definitions(content PRIVATE
     LLAMA_MODEL_FILE=\"${LLAMA_MODEL_NAME}\"
     LLAMA_DOWNLOAD_URL=\"${LLAMA_DOWNLOAD_URL}\"
+    WHISPER_MODEL_NAME=\"${WHISPER_MODEL_NAME}\"
+    WHISPER_DOWNLOAD_URL=\"${WHISPER_DOWNLOAD_URL}\"
 )
 
 message(STATUS "Check: listing directory = ${LLAMA_LIB_FILE_DIR}")
@@ -23,11 +25,26 @@ execute_process(
     OUTPUT_VARIABLE DIR_CONTENTS
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-message(STATUS "Dir content:\n${DIR_CONTENTS}")
+message(STATUS "Llama library dir content:\n${DIR_CONTENTS}")
+
+message(STATUS "Check: listing directory = ${WHISPER_LIB_FILE_DIR}")
+execute_process(
+    COMMAND ls -la
+    WORKING_DIRECTORY "${WHISPER_LIB_FILE_DIR}"
+    OUTPUT_VARIABLE DIR_CONTENTS
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+message(STATUS "Whisper library dir content:\n${DIR_CONTENTS}")
 
 find_library(LLAMA_LIB
     NAMES llama
     PATHS "${LLAMA_LIB_FILE_DIR}"
+    NO_DEFAULT_PATH
+)
+
+find_library(WHISPER_LIB
+    NAMES whisper
+    PATHS "${WHISPER_LIB_FILE_DIR}"
     NO_DEFAULT_PATH
 )
 
@@ -55,12 +72,25 @@ if(NOT IOS)
         # 追加のパスがあれば追記 (Add extra paths here if necessary)
     )
 
+    find_library(WHISPER_LIB
+        NAMES whisper libwhisper
+        PATHS "${WHISPER_LIB_FILE_DIR}"
+        NO_DEFAULT_PATH
+        NO_CMAKE_FIND_ROOT_PATH
+    )
+
     # 見つからない場合はビルドを中断
     # Abort build if not found
     if(LLAMA_LIB)
         message(STATUS "Found llama library: ${LLAMA_LIB}")
     else()
         message(FATAL_ERROR "Could not find llama library (e.g. llama.lib / libllama.dylib / libllama.so)")
+    endif()
+
+    if(WHISPER_LIB)
+        message(STATUS "Found whisper library: ${WHISPER_LIB}")
+    else()
+        message(FATAL_ERROR "Could not find whisper library (e.g. whisper.lib / libwhisper.dylib / libwhisper.so)")
     endif()
 
     if(GGML_LIB)
@@ -71,6 +101,7 @@ if(NOT IOS)
 
     set(ALL_LIBS
         ${LLAMA_LIB}
+        ${WHISPER_LIB}
         ${GGML_LIB}
     )
 endif()
@@ -81,6 +112,7 @@ endif()
 target_include_directories(content PRIVATE
     ${CMAKE_SOURCE_DIR}/3rdparty/llama.cpp/include
     ${CMAKE_SOURCE_DIR}/3rdparty/llama.cpp/ggml/include
+    ${WHISPER_INCLUDE_DIR}
 )
 
 # ----------------------------------------------------------------------------
@@ -111,6 +143,19 @@ if(WIN32)
         )
     endforeach()
 
+    # whisper*.dll をコピー (Copy whisper*.dll if multiple variants exist)
+    file(GLOB WHISPER_DLLS
+        "${WHISPER_LIB_FILE_DIR}/whisper*.dll"
+    )
+    foreach(dll_file ${WHISPER_DLLS})
+        add_custom_command(TARGET content POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${dll_file}"
+            "$<TARGET_FILE_DIR:QllamaTalkApp>"
+            COMMENT "Copying whisper DLLs to QllamaTalkApp"
+        )
+endforeach()
+
 elseif(APPLE)
     if(IOS)
         # iOS: llama_setup.cmake でビルドされた libllama.a と
@@ -129,58 +174,73 @@ elseif(APPLE)
         file(GLOB GGML_STATIC_LIBS
             "${GGML_LIB_FILE_DIR}/libggml*.a"
         )
-        # 追加のライブラリがあれば手動でリストに追加
-        list(APPEND GGML_STATIC_LIBS
-            "${GGML_LIB_FILE_DIR}/ggml-metal/libggml-metal.a"
-            "${GGML_LIB_FILE_DIR}/ggml-blas/libggml-blas.a"
-        )
+    # 追加のライブラリがあれば手動でリストに追加
+    list(APPEND GGML_STATIC_LIBS
+        "${GGML_LIB_FILE_DIR}/ggml-metal/libggml-metal.a"
+        "${GGML_LIB_FILE_DIR}/ggml-blas/libggml-blas.a"
+    )
 
-        find_library(ACCELERATE Accelerate)
+# whisper 側の静的ライブラリを取得 (whipser.a)
+set(WHISPER_STATIC_PATH "${WHISPER_STATIC_LIB_DIR}/libwhisper.a")
+if(EXISTS "${WHISPER_STATIC_PATH}")
+    message(STATUS "Using libwhisper.a for iOS: ${WHISPER_STATIC_PATH}")
+else()
+    message(FATAL_ERROR "Could not find whisper static library (libwhisper.a) in ${WHISPER_STATIC_LIB_DIR}")
+endif()
+find_library(ACCELERATE Accelerate)
 
-        if(ACCELERATE)
-            message(STATUS "Found Accelerate library: ${ACCELERATE}")
-        else()
-            message(FATAL_ERROR "Could not find Accelerate library")
-        endif()
+if(ACCELERATE)
+    message(STATUS "Found Accelerate library: ${ACCELERATE}")
+else()
+    message(FATAL_ERROR "Could not find Accelerate library")
+endif()
 
-        if(GGML_STATIC_LIBS)
-            message(STATUS "Found ggml static libraries for iOS:")
-            foreach(libfile ${GGML_STATIC_LIBS})
-                message(STATUS "  - ${libfile}")
-            endforeach()
-        else()
-            message(FATAL_ERROR "Could not find any libggml*.a in ${GGML_LIB_FILE_DIR}")
-        endif()
+if(GGML_STATIC_LIBS)
+    message(STATUS "Found ggml static libraries for iOS:")
+    foreach(libfile ${GGML_STATIC_LIBS})
+        message(STATUS "  - ${libfile}")
+    endforeach()
+else()
+    message(FATAL_ERROR "Could not find any libggml*.a in ${GGML_LIB_FILE_DIR}")
+endif()
 
-        # 一つのリストにまとめる (Combine all libs into one list)
-        set(ALL_LIBS
-            ${LLAMA_STATIC_PATH}
-            ${GGML_STATIC_LIBS}
-            ${ACCELERATE}
-        )
-    else()
-        # macOS: .dylib をコピー
-        # macOS: copy .dylib files
+# 一つのリストにまとめる (Combine all libs into one list)
+set(ALL_LIBS
+    ${LLAMA_STATIC_PATH}
+    ${GGML_STATIC_LIBS}
+    ${WHISPER_STATIC_PATH}
+    ${ACCELERATE}
+)
+else()
+    # macOS: .dylib をコピー
+    # macOS: copy .dylib files
 
+    add_custom_command(TARGET content POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${LLAMA_DYNAMIC_LIB_FILE_DIR}/libllama.dylib"
+        "$<TARGET_FILE_DIR:QllamaTalkApp>"
+        COMMENT "Copying libllama.dylib to QllamaTalkApp"
+    )
+
+    add_custom_command(TARGET content POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${WHISPER_LIB_FILE_DIR}/libwhisper*.dylib"
+        "$<TARGET_FILE_DIR:QllamaTalkApp>"
+        COMMENT "Copying libwhisper*.dylib to Qllama"
+    )
+
+    file(GLOB GGML_DYLIBS
+        "${GGML_DYNAMIC_LIB_FILE_DIR}/libggml*.dylib"
+    )
+    foreach(dylib_file ${GGML_DYLIBS})
         add_custom_command(TARGET content POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${LLAMA_DYNAMIC_LIB_FILE_DIR}/libllama.dylib"
+            "${dylib_file}"
             "$<TARGET_FILE_DIR:QllamaTalkApp>"
-            COMMENT "Copying libllama.dylib to QllamaTalkApp"
+            COMMENT "Copying libggml*.dylib to QllamaTalkApp"
         )
-
-        file(GLOB GGML_DYLIBS
-            "${GGML_DYNAMIC_LIB_FILE_DIR}/libggml*.dylib"
-        )
-        foreach(dylib_file ${GGML_DYLIBS})
-            add_custom_command(TARGET content POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "${dylib_file}"
-                "$<TARGET_FILE_DIR:QllamaTalkApp>"
-                COMMENT "Copying libggml*.dylib to QllamaTalkApp"
-            )
-        endforeach()
-    endif()
+endforeach()
+endif()
 else()
     # Linux / UNIX / Android: .so をコピー
     # Linux/UNIX/Android: copy .so files
@@ -196,13 +256,20 @@ else()
         "${GGML_DYNAMIC_LIB_FILE_DIR}/libggml*.so"
     )
     foreach(so_file ${GGML_SOS})
-        add_custom_command(TARGET content POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${so_file}"
-            "$<TARGET_FILE_DIR:QllamaTalkApp>"
-            COMMENT "Copying libggml*.so to QllamaTalkApp"
-        )
-    endforeach()
+    add_custom_command(TARGET content POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${so_file}"
+        "$<TARGET_FILE_DIR:QllamaTalkApp>"
+        COMMENT "Copying libggml*.so to QllamaTalkApp"
+    )
+
+    add_custom_command(TARGET content POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${WHISPER_LIB_FILE_DIR}/libwhisper*.so"
+        "$<TARGET_FILE_DIR:QllamaTalkApp>"
+        COMMENT "Copying libwhisper*.so to QllamaTalkApp"
+    )
+endforeach()
 endif()
 
 # ----------------------------------------------------------------------------
@@ -213,30 +280,47 @@ qt6_add_qml_module(content
     VERSION 1.0
     RESOURCE_PREFIX "/qt/qml"
     QML_FILES
-        App.qml
-        Screen01.ui.qml
-        ChatView.qml
-        ChatInputField.qml
+    App.qml
+    Screen01.ui.qml
+    ChatView.qml
+    ChatInputField.qml
+    Expander.qml
+    OperationPhaseIcon.qml
     RESOURCES
-        fonts/fonts.txt
-        icons/online.svg
-        icons/offline.svg
-        icons/local_error.svg
-        icons/remote_error.svg
+    fonts/fonts.txt
+    icons/online.svg
+    icons/offline.svg
+    icons/local_error.svg
+    icons/remote_error.svg
+    icons/arrow.svg
+    icons/listening_phase.svg
+    icons/vad_running_phase.svg
+    icons/whisper_running_phase.svg
+    icons/llama_running_phase.svg
+    icons/waiting_user_input_phase.svg
+    icons/speaking_phase.svg
     SOURCES
     ChatMessageModel.cpp
-        ChatMessageModel.h
-        LlamaChatEngine.h
-        LlamaChatEngine.cpp
-        LlamaResponseGenerator.h
-        LlamaResponseGenerator.cpp
-        RemoteResponseGeneratorCompositor.h
-        RemoteResponseGeneratorCompositor.cpp
-        QtWebSocketsRemoteGenerator.h
-        QtWebSocketsRemoteGenerator.cpp
-        QtRemoteObjectsRemoteGenerator.h
-        QtRemoteObjectsRemoteGenerator.cpp
-        RemoteGeneratorInterface.h
+    ChatMessageModel.h
+    LlamaChatEngine.h
+    LlamaChatEngine.cpp
+    LlamaResponseGenerator.h
+    LlamaResponseGenerator.cpp
+    RemoteResponseGeneratorCompositor.h
+    RemoteResponseGeneratorCompositor.cpp
+    QtWebSocketsRemoteGenerator.h
+    QtWebSocketsRemoteGenerator.cpp
+    QtRemoteObjectsRemoteGenerator.h
+    QtRemoteObjectsRemoteGenerator.cpp
+    RemoteGeneratorInterface.h
+    VoiceRecognitionEngine.h
+    VoiceRecognitionEngine.cpp
+    VoiceDetector.h
+    VoiceDetector.cpp
+    common.h
+    common.cpp
+    dr_wav.h
+    OperationPhase.h
 )
 
 # ----------------------------------------------------------------------------
@@ -247,6 +331,8 @@ target_link_libraries(content PRIVATE
     Qt6::Concurrent
     Qt6::RemoteObjects
     Qt6::WebSockets
+    Qt6::Multimedia
+    Qt6::TextToSpeech
 )
 
 if(NOT ANDROID)
@@ -257,8 +343,8 @@ if(NOT ANDROID)
     add_custom_command(
         TARGET content POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_LIST_DIR}/llama_models/${LLAMA_MODEL_NAME}"
-            "$<TARGET_FILE_DIR:QllamaTalkApp>"
+        "${CMAKE_CURRENT_LIST_DIR}/llama_models/${LLAMA_MODEL_NAME}"
+        "$<TARGET_FILE_DIR:QllamaTalkApp>"
         COMMENT "Copying ${LLAMA_MODEL_NAME} next to the QllamaTalkApp binary"
     )
 endif()
