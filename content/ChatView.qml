@@ -96,6 +96,7 @@ Rectangle {
                         color: "#f3f3f4"
                         wrapMode: Text.Wrap
                         text: model.messageContent
+                        textFormat: Text.MarkdownText
                     }
                 }
             }
